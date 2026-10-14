@@ -5,6 +5,26 @@
 > 0.9.0 on, GPL-3.0-or-later; releases up to 0.8.6 stay MIT. Every release
 > under the earlier names is withdrawn from PyPI.
 
+### Only what you actually ship
+
+A Python lockfile holds the resolution for *every* environment the resolver
+considered — `uv.lock` writes one entry per resolution, each with its own
+markers. Tell the tool what you ship and the rest stops counting as yours:
+
+```bash
+jochwacht-sbom . --target-env "python=3.10;platform=linux;arch=aarch64,x86_64"
+```
+
+Comma multiplies, semicolon separates the axes. Keys: `python`, `platform`,
+`arch`, `system`, `os`, `implementation`. Resolutions no target reaches are
+kept in the bill as `scope="excluded"` with the reason — nothing is deleted,
+so your bill still agrees with your lockfile. Without the flag nothing is
+evaluated and the output is unchanged.
+
+A marker that needs something you did not declare is **not** guessed: it
+counts as shipped, with a note. Otherwise the answer would depend on the
+machine that ran the scan.
+
 ### If you installed this tool under its earlier name
 
 Remove that installation and install this one — there is no forwarding

@@ -172,3 +172,37 @@ def test_the_two_halves_agree() -> None:
     envs, _ = parse_target_spec(_ZIEL)
     assert evaluate(_MARKER_3_13, envs).shipped is False
     assert evaluate(_MARKER_VOR_3_13, envs).shipped is True
+
+
+def test_a_build_tool_name_keeps_its_marker_reason(tmp_path: Path) -> None:
+    """``cmake==3.27 ; sys_platform == "win32"`` is BOTH a tool name and
+    marker-excluded.
+
+    The tooling branch of the collector built a fresh component and dropped
+    the reason, so the run printed "test/example directories or dev
+    tooling" for it — the false statement the summary refuses to make — and
+    the suite kept the reason, so the halves disagreed (found in review,
+    14.10.2026).
+    """
+    from jochwacht_sbom.collector import collect_components
+
+    req = tmp_path / "requirements.txt"
+    req.write_text(
+        "\n".join([
+            'cmake==3.27.0 ; sys_platform == "win32"',
+            "jinja2==3.1.2",
+            "",
+        ]),
+        encoding="utf-8",
+    )
+    envs, _ = parse_target_spec("python=3.10;platform=linux;arch=x86_64")
+    komponenten, _ = collect_components(tmp_path, target_envs=envs)
+    nach_namen = {c.name: c for c in komponenten}
+
+    cmake = nach_namen["cmake"]
+    assert cmake.scope == "excluded"
+    assert "no marker is true" in cmake.scope_reason, (
+        "the reason must survive the tooling branch, or the summary calls a "
+        "marker exclusion 'test material'"
+    )
+    assert cmake.markers == ('sys_platform == "win32"',)

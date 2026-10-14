@@ -228,6 +228,16 @@ def collect_components(
                 tier=_LOCKFILE_TIER,
                 confidence=_MANIFEST_CONFIDENCE,
                 scope="excluded",
+                # Two different reasons reach scope="excluded" now, and a
+                # name can carry both: `cmake==3.27 ; sys_platform ==
+                # "win32"` is a build-tool name AND marker-excluded.
+                # Dropping the reason here made the run print "test/example
+                # directories or dev tooling" for it — the exact false
+                # statement cli.py refuses to make, and the suite kept the
+                # reason, so the two halves disagreed (found in review).
+                scope_reason=dep.scope_reason,
+                markers=dep.markers,
+                marker_note=dep.marker_note,
             )
             continue
         # Curated skip list (build tools, system libs) applies only to

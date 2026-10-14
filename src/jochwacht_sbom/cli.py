@@ -376,8 +376,16 @@ def _run(  # noqa: PLR0913 — mirrors the CLI surface
             f"[yellow]{len(nicht_geliefert)} resolution(s) are not shipped into any "
             f"target environment[/yellow] — not counted as yours:"
         )
-        for c in sorted(nicht_geliefert, key=lambda x: (x.name, x.version)):
+        # Capped like the send preview: a heavily forked lockfile would
+        # otherwise push the rest of the output off the screen.
+        sortiert = sorted(nicht_geliefert, key=lambda x: (x.name, x.version))
+        for c in sortiert[:15]:
             console.print(f"  [dim]{c.name} {c.version}[/dim]")
+        if len(sortiert) > 15:
+            console.print(
+                f"  [dim]… and {len(sortiert) - 15} more (all of them are in "
+                f"the bill with their reason)[/dim]"
+            )
     # The diagnosis file lives next to the SBOM (order
     # idee-fehlerrueckmeldung-sammler): the project directory, or the
     # directory of --sbom.

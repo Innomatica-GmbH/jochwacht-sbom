@@ -314,7 +314,14 @@ def scan_conanfile_txt(path: Path) -> list[Dependency]:
 def scan_requirements_txt(
     path: Path, *, target_envs: list[TargetEnv] | None = None,
 ) -> list[Dependency]:
-    """Parse a pip requirements.txt file."""
+    """Parse a pip requirements.txt file.
+
+    A line may carry a PEP 508 marker after a semicolon
+    (``onnx==1.19.0 ; python_version >= "3.13"``). With declared target
+    environments a line no target can reach is marked ``scope="excluded"``
+    with a reason instead of being listed as shipped. Without them nothing
+    is evaluated and the output is unchanged.
+    """
     deps: list[Dependency] = []
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
