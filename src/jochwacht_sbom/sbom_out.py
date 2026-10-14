@@ -64,6 +64,25 @@ def _component(comp: CheckComponent) -> dict[str, object]:
         props.append({"name": properties.name("ecosystem"), "value": comp.ecosystem})
     if comp.source_type:
         props.append({"name": properties.name("detected-by"), "value": comp.source_type})
+    # Environment markers: local only. These fields are excluded from the
+    # payload on purpose (see payload.CheckComponent) — they belong in the
+    # customer's own bill, where they explain why a resolution of their own
+    # lockfile is marked as not shipped.
+    if comp.markers:
+        props.append({
+            "name": properties.name("environment-markers"),
+            "value": " | ".join(comp.markers),
+        })
+    if comp.scope_reason:
+        props.append({
+            "name": properties.name("not-shipped-reason"),
+            "value": comp.scope_reason,
+        })
+    if comp.marker_note:
+        props.append({
+            "name": properties.name("marker-not-evaluated"),
+            "value": comp.marker_note,
+        })
     if props:
         out["properties"] = props
     return out

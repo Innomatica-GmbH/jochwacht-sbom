@@ -44,6 +44,19 @@ class CheckComponent(BaseModel):
     #: CycloneDX scope — "excluded" marks test/example material and dev
     #: tooling: listed, but never gating.
     scope: str = ""
+    #: Why a resolution is not shipped (a PEP 508 marker that is false for
+    #: every declared target environment) and the markers themselves.
+    #:
+    #: ``exclude=True`` on purpose: these never leave the machine. The
+    #: promise of this tool is that only names and versions travel, and the
+    #: preview before ``--send`` shows exactly that. The information is for
+    #: the LOCAL bill, where it tells the customer why a component of their
+    #: own lockfile is marked as not shipped. The payload carries the
+    #: consequence (``scope="excluded"``), which is what stops a finding
+    #: from being counted as shipped — the reason is not needed for that.
+    scope_reason: str = Field(default="", exclude=True)
+    markers: tuple[str, ...] = Field(default_factory=tuple, exclude=True)
+    marker_note: str = Field(default="", exclude=True)
     #: A CMake find_package behind an off-by-default option is an ALTERNATIVE,
     #: not a component of the default build (Befund 38/44). When set, this
     #: carries the plain-text guard ("nur bei: PAHO_WITH_LIBRESSL"): the

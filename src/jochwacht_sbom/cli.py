@@ -119,6 +119,18 @@ _stdout = Console(soft_wrap=True)
     "them for SBOM purposes; --dry-run shows the payload either way).",
 )
 @click.option(
+    "--target-env",
+    "target_env",
+    default="",
+    metavar="SPEC",
+    help='The environments your product ships into, e.g. '
+    '"python=3.10;platform=linux;arch=aarch64,x86_64". A Python lockfile '
+    "resolution whose PEP 508 markers are false for all of them is marked "
+    "as not shipped instead of being reported as a component you ship. "
+    "Without this nothing is evaluated. Keys: python, platform, arch, "
+    "system, os, implementation.",
+)
+@click.option(
     "--url",
     default=DEFAULT_SUBMIT_URL,
     show_default=False,
@@ -133,6 +145,7 @@ def main(  # noqa: PLR0913 — CLI surface, mirrors documented flags
     code: str,
     voucher: str,
     lang: str | None,
+    target_env: str,
     contact_email: str,
     dry_run: bool,
     output: Path | None,
@@ -162,6 +175,7 @@ def main(  # noqa: PLR0913 — CLI surface, mirrors documented flags
             code=code,
             voucher=voucher,
             lang=lang,
+            target_env=target_env,
             contact_email=contact_email,
             dry_run=dry_run,
             output=output,
@@ -279,6 +293,7 @@ def _run(  # noqa: PLR0913 — mirrors the CLI surface
     code: str,
     voucher: str,
     lang: str | None = None,
+    target_env: str = "",
     contact_email: str,
     dry_run: bool,
     output: Path | None,
@@ -338,11 +353,31 @@ def _run(  # noqa: PLR0913 — mirrors the CLI surface
         )
 
     diagnosis.reset()
+    from jochwacht_sbom.sbom.markers import parse_target_spec
+
+    target_envs, env_warnings = parse_target_spec(target_env)
+    for warnung in env_warnings:
+        console.print(f"[yellow]Note:[/yellow] {warnung}")
+    if target_envs:
+        console.print(
+            f"[dim]Target environments ({len(target_envs)}): "
+            f"{'; '.join(e.label for e in target_envs)}[/dim]"
+        )
+
     components, stats = collect_components(
         path,
         with_tools=with_tools,
         include_declared_metadata=not no_declared_metadata,
+        target_envs=target_envs,
     )
+    nicht_geliefert = [c for c in components if c.scope == "excluded" and c.scope_reason]
+    if nicht_geliefert:
+        console.print(
+            f"[yellow]{len(nicht_geliefert)} resolution(s) are not shipped into any "
+            f"target environment[/yellow] — not counted as yours:"
+        )
+        for c in sorted(nicht_geliefert, key=lambda x: (x.name, x.version)):
+            console.print(f"  [dim]{c.name} {c.version}[/dim]")
     # The diagnosis file lives next to the SBOM (order
     # idee-fehlerrueckmeldung-sammler): the project directory, or the
     # directory of --sbom.
@@ -472,12 +507,26 @@ def _run(  # noqa: PLR0913 — mirrors the CLI surface
             f"vulnerable ones.[/dim]"
         )
 
-    ausgeschlossen = sum(1 for c in components if c.scope == "excluded")
-    if ausgeschlossen:
+    # Two different reasons end up as scope="excluded" and they must not be
+    # conflated: test/example material and dev tooling on one side, a PEP 508
+    # marker that no target environment reaches on the other. Calling the
+    # second one "test material" would be a false statement about the
+    # customer's project.
+    marker_aus = sum(1 for c in components if c.scope == "excluded" and c.scope_reason)
+    material_aus = sum(
+        1 for c in components if c.scope == "excluded" and not c.scope_reason
+    )
+    if material_aus:
         console.print(
-            f"[dim]{ausgeschlossen} component(s) from test/example "
+            f"[dim]{material_aus} component(s) from test/example "
             f"directories or dev tooling marked scope=excluded — listed, "
             f"never gating. Adjust via .jochwachtignore.[/dim]"
+        )
+    if marker_aus:
+        console.print(
+            f"[dim]{marker_aus} component(s) marked scope=excluded because no "
+            f"target environment reaches them — listed, never gating. The "
+            f"reason is in the bill as jochwacht:not-shipped-reason.[/dim]"
         )
     declared = sum(1 for c in components if c.source_type == "declared")
     if declared and not no_declared_metadata:

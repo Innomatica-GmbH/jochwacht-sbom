@@ -33,20 +33,25 @@ import tomllib
 import xml.etree.ElementTree as ET
 from collections.abc import Callable
 from pathlib import Path
+from typing import TYPE_CHECKING
 from urllib.parse import quote
 
 import yaml
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from jochwacht_sbom import filenames as file_names
 from jochwacht_sbom.core.log import get_logger
 from jochwacht_sbom.diagnosis import record_failure
+from jochwacht_sbom.sbom import markers as markers_mod
 from jochwacht_sbom.sbom.cmake_conditions import (
     CMakeContext,
     build_cmake_context,
     find_packages,
     version_from_cache,
 )
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from jochwacht_sbom.sbom.markers import TargetEnv
 
 logger = get_logger(__name__)
 
@@ -110,6 +115,16 @@ class Dependency(BaseModel):
     # SBOM honesty, NOT a query filter — dev components are still checked
     # for vulnerabilities (order osv-chunking A4).
     scope: str = ""
+    #: Why ``scope`` was set, when the lockfile alone does not show it —
+    #: today: a PEP 508 marker that is false for every declared target
+    #: environment. Travels into the bill as a property.
+    scope_reason: str = ""
+    #: The PEP 508 markers of this resolution, as the lockfile wrote them.
+    markers: tuple[str, ...] = Field(default_factory=tuple)
+    #: Why a marker could NOT be decided, when the resolution is therefore
+    #: counted as shipped. Kept apart from ``scope_reason``: a component
+    #: that ships must not carry a "not-shipped-reason".
+    marker_note: str = ""
     # True only for entries the customer wrote into jochwacht-deps.yaml.
     # A declaration is authoritative (its supplier/license/purl/cpe were
     # stated on purpose, they beat anything a database could guess) and,
@@ -296,7 +311,9 @@ def scan_conanfile_txt(path: Path) -> list[Dependency]:
     return deps
 
 
-def scan_requirements_txt(path: Path) -> list[Dependency]:
+def scan_requirements_txt(
+    path: Path, *, target_envs: list[TargetEnv] | None = None,
+) -> list[Dependency]:
     """Parse a pip requirements.txt file."""
     deps: list[Dependency] = []
     try:
@@ -309,18 +326,30 @@ def scan_requirements_txt(path: Path) -> list[Dependency]:
         stripped = line.strip()
         if not stripped or stripped.startswith("#") or stripped.startswith("-"):
             continue
+        # pip treats "#" as a comment, and it has to be cut BEFORE the
+        # marker is split off: otherwise "pkg ; marker  # note" makes the
+        # marker unparsable and "pkg  # ticket #12; reason" invents one.
+        ohne_kommentar = _strip_requirement_comment(stripped)
+        if not ohne_kommentar:
+            continue
+        anforderung, _, marker_text = ohne_kommentar.partition(";")
         # Match: package==version or package>=version etc.
-        match = re.match(r"^([a-zA-Z0-9_.-]+)\s*([=~!<>]=*)\s*([a-zA-Z0-9._*-]+)", stripped)
+        match = re.match(
+            r"^([a-zA-Z0-9_.-]+)\s*([=~!<>]=*)\s*([a-zA-Z0-9._*-]+)", anforderung.strip()
+        )
         if match:
             name, operator, version = match.group(1), match.group(2), match.group(3)
-            deps.append(Dependency(
+            dep = Dependency(
                 name=name,
                 version=version,
                 ecosystem="pypi",
                 purl=_make_purl("pypi", name, version),
                 # ">=1.2" names a floor, not the deployed version.
                 source_kind="" if operator == "==" else "manifest",
-            ))
+            )
+            _apply_markers(dep, [marker_text.strip()] if marker_text.strip() else [],
+                           target_envs, path)
+            deps.append(dep)
 
     logger.info("Found %d dependencies in %s", len(deps), path)
     return deps
@@ -418,7 +447,9 @@ def scan_pyproject_toml(path: Path) -> list[Dependency]:
     return deps
 
 
-def scan_poetry_lock(path: Path) -> list[Dependency]:
+def scan_poetry_lock(
+    path: Path, *, target_envs: list[TargetEnv] | None = None,
+) -> list[Dependency]:
     """Parse a Poetry poetry.lock (TOML) file."""
     deps: list[Dependency] = []
     try:
@@ -431,19 +462,58 @@ def scan_poetry_lock(path: Path) -> list[Dependency]:
         name = pkg.get("name", "")
         version = pkg.get("version", "")
         if name and version:
-            deps.append(Dependency(
+            dep = Dependency(
                 name=name,
                 version=version,
                 ecosystem="pypi",
                 purl=_make_purl("pypi", name, version),
                 description=pkg.get("description"),
-            ))
+            )
+            # Poetry writes ONE marker string per package ("markers = …").
+            _apply_markers(dep, [str(pkg.get("markers") or "")], target_envs, path)
+            deps.append(dep)
 
     logger.info("Found %d dependencies in %s", len(deps), path)
     return deps
 
 
-def scan_uv_lock(path: Path) -> list[Dependency]:
+def _strip_requirement_comment(line: str) -> str:
+    """A requirements line without its trailing ``#`` comment.
+
+    pip starts a comment at a ``#`` that begins the line or follows
+    whitespace; a ``#`` glued to text is part of the value.
+    """
+    if line.startswith("#"):
+        return ""
+    treffer = re.search(r"\s#", line)
+    return line[: treffer.start()].strip() if treffer else line.strip()
+
+
+def _apply_markers(
+    dep: Dependency, roh: list[str], target_envs: list[TargetEnv] | None, path: Path,
+) -> None:
+    """Record what the markers of one entry mean for *dep*.
+
+    Nothing happens without declared target environments — the output then
+    stays bit-identical to the release before this feature.
+    """
+    roh = [m for m in roh if m.strip()]
+    if not roh or not target_envs:
+        return
+    dep.markers = tuple(roh)
+    urteil = markers_mod.evaluate(roh, target_envs)
+    if urteil.undecidable:
+        logger.warning("%s %s (%s): %s", dep.name, dep.version, path.name, urteil.reason)
+        dep.marker_note = urteil.reason
+    elif not urteil.shipped:
+        dep.scope = "excluded"
+        dep.scope_reason = urteil.reason
+        logger.info("%s %s not shipped: %s", dep.name, dep.version, urteil.reason)
+
+
+def scan_uv_lock(
+    path: Path, *, target_envs: list[TargetEnv] | None = None,
+) -> list[Dependency]:
     """Parse a uv uv.lock (TOML) file.
 
     The lockfile carries the fully resolved transitive closure of a uv
@@ -467,12 +537,17 @@ def scan_uv_lock(path: Path) -> list[Dependency]:
         ):
             continue
         if name and version:
-            deps.append(Dependency(
+            dep = Dependency(
                 name=name,
                 version=version,
                 ecosystem="pypi",
                 purl=_make_purl("pypi", name, version),
-            ))
+            )
+            # One package entry per RESOLUTION: uv writes the same package
+            # several times, each with the markers that select it.
+            roh = [str(m) for m in (pkg.get("resolution-markers") or []) if str(m).strip()]
+            _apply_markers(dep, roh, target_envs, path)
+            deps.append(dep)
 
     logger.info("Found %d dependencies in %s", len(deps), path)
     return deps
@@ -1682,10 +1757,15 @@ def _read_with(
         return []
 
 
+#: Readers that evaluate PEP 508 environment markers.
+_MARKER_AWARE = frozenset({"uv_lock", "poetry_lock", "requirements_txt"})
+
+
 def scan_directory(
     path: Path, *, fpga_recursive: bool = True,
     cmake_ctx: CMakeContext | None = None,
     cmake_extra_cache: Path | None = None,
+    target_envs: list[TargetEnv] | None = None,
 ) -> list[Dependency]:
     """Auto-detect and scan all supported dependency files in a directory.
 
@@ -1715,6 +1795,11 @@ def scan_directory(
             if scanner_key == "cmake":
                 all_deps.extend(_read_with(
                     "cmake", filename, scan_cmake, filepath, cmake_ctx=cmake_ctx,
+                ))
+            elif scanner_key in _MARKER_AWARE:
+                all_deps.extend(_read_with(
+                    scanner_key, filename, _SCANNER_FUNCS[scanner_key], filepath,
+                    target_envs=target_envs,
                 ))
             else:
                 all_deps.extend(_read_with(
@@ -1906,6 +1991,7 @@ def is_test_material_part(part: str) -> bool:
 
 def scan_directory_recursive(
     path: Path, *, max_depth: int = 5, cmake_extra_cache: Path | None = None,
+    target_envs: list[TargetEnv] | None = None,
 ) -> list[Dependency]:
     """Recursively scan a directory tree for dependency files.
 
@@ -1947,7 +2033,10 @@ def scan_directory_recursive(
             return
 
         # Scan this directory (FPGA sweep off — this walk visits every dir)
-        found = scan_directory(current, fpga_recursive=False, cmake_ctx=cmake_ctx)
+        found = scan_directory(
+            current, fpga_recursive=False, cmake_ctx=cmake_ctx,
+            target_envs=target_envs,
+        )
         # Test/example material travels, but marked: scope "excluded"
         # keeps it out of the traffic light while hiding nothing
         # (order collector-mehrfachversionen Befund 10, way (b) — a

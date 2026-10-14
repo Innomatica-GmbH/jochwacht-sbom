@@ -15,6 +15,7 @@ anywhere, instantly, with zero setup.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from jochwacht_sbom import filenames as file_names
 from jochwacht_sbom.analyzer.normalize import normalize_dep_name
@@ -31,6 +32,9 @@ from jochwacht_sbom.sbom.classify import (
     strip_control_chars,
 )
 from jochwacht_sbom.sbom.scanner import is_test_material_part, scan_directory_recursive
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from jochwacht_sbom.sbom.markers import TargetEnv
 
 #: Deterministic pipeline tiers that need no tooling on the host.
 _DEFAULT_TIERS = frozenset({2, 4})
@@ -116,6 +120,7 @@ def collect_components(
     with_tools: bool = False,
     max_depth: int = 5,
     include_declared_metadata: bool = True,
+    target_envs: list[TargetEnv] | None = None,
 ) -> tuple[list[CheckComponent], CheckStats]:
     """Collect deduplicated dependency metadata from a project directory.
 
@@ -193,7 +198,9 @@ def collect_components(
             condition=condition, scope="optional",
         ))
 
-    for dep in scan_directory_recursive(path, max_depth=max_depth):
+    for dep in scan_directory_recursive(
+        path, max_depth=max_depth, target_envs=target_envs,
+    ):
         # Control-char hygiene FIRST (Befund 15 — a scanner once read colored
         # tool output), so the dedup key and the uploaded payload are clean.
         clean_dependency(dep)
@@ -254,6 +261,9 @@ def collect_components(
                 purl=(dep.purl or "") if include_declared_metadata else "",
                 cpe=(dep.cpe or "") if include_declared_metadata else "",
                 scope=dep.scope,
+                scope_reason=dep.scope_reason,
+                markers=dep.markers,
+                marker_note=dep.marker_note,
             )
             continue
         is_floor = dep.source_kind == "manifest"
@@ -265,6 +275,9 @@ def collect_components(
             tier=_LOCKFILE_TIER,
             confidence=_MANIFEST_CONFIDENCE if is_floor else _LOCKFILE_CONFIDENCE,
             scope=dep.scope,
+                scope_reason=dep.scope_reason,
+                markers=dep.markers,
+                marker_note=dep.marker_note,
         )
 
     # Path 2: build-file pipeline (deterministic tiers only).
