@@ -21,9 +21,17 @@ kept in the bill as `scope="excluded"` with the reason — nothing is deleted,
 so your bill still agrees with your lockfile. Without the flag nothing is
 evaluated and the output is unchanged.
 
+Both places a condition can sit are read: the package entry and the
+dependency edge (`uv.lock` writes it in either). A package that only a false
+edge leads to is not shipped either.
+
 A marker that needs something you did not declare is **not** guessed: it
 counts as shipped, with a note. Otherwise the answer would depend on the
 machine that ran the scan.
+
+One thing to get right yourself: `--target-env` must be the environment you
+really ship. Nothing checks it against your `requires-python`, so declaring
+3.10 while shipping 3.12 produces an exclusion that is simply wrong.
 
 ### If you installed this tool under its earlier name
 

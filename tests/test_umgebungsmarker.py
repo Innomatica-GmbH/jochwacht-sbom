@@ -206,3 +206,90 @@ def test_a_build_tool_name_keeps_its_marker_reason(tmp_path: Path) -> None:
         "marker exclusion 'test material'"
     )
     assert cmake.markers == ('sys_platform == "win32"',)
+
+
+# --------------------------------------------------------------------------
+# Edge markers (ported from the suite, 15.10.2026)
+# --------------------------------------------------------------------------
+
+def _ws(tmp_path: Path, mitglied: str, pakete: str) -> Path:
+    lock = tmp_path / "uv.lock"
+    lock.write_text(
+        'version = 1\n\n[[package]]\nname = "produkt"\nversion = "0.1.0"\n'
+        f'source = {{ editable = "." }}\ndependencies = [{mitglied}]\n\n' + pakete,
+        encoding="utf-8",
+    )
+    return lock
+
+
+def _pkg(name: str, version: str = "1.0.0", deps: str = "") -> str:
+    zeile = f"dependencies = [{deps}]\n" if deps else ""
+    return (
+        f'[[package]]\nname = "{name}"\nversion = "{version}"\n'
+        f'source = {{ registry = "https://pypi.org/simple" }}\n{zeile}\n'
+    )
+
+
+def test_a_package_reached_only_by_a_false_edge_is_not_shipped(tmp_path: Path) -> None:
+    lock = _ws(
+        tmp_path, '{ name = "click" }',
+        _pkg("click", deps='{ name = "colorama", marker = "sys_platform == \'win32\'" }')
+        + _pkg("colorama", "0.4.6"),
+    )
+    envs, _ = parse_target_spec("python=3.10;platform=linux;arch=x86_64")
+    deps = {d.name: d for d in scan_uv_lock(lock, target_envs=envs)}
+    assert deps["colorama"].scope == "excluded"
+    assert "dependency condition" in deps["colorama"].scope_reason
+    assert deps["click"].scope != "excluded"
+
+
+def test_development_material_never_enters_the_difference(tmp_path: Path) -> None:
+    """This reader has no dev-scope closure — the two traversals make that safe.
+
+    Development material is unreachable in BOTH traversals, so it cannot
+    appear in the difference and can never be called a marker exclusion.
+    """
+    lock = _ws(tmp_path, '{ name = "click" }', _pkg("click") + _pkg("mypy", "1.11.0"))
+    envs, _ = parse_target_spec("python=3.10;platform=linux;arch=x86_64")
+    mypy = next(d for d in scan_uv_lock(lock, target_envs=envs) if d.name == "mypy")
+    assert mypy.scope != "excluded"
+    assert mypy.scope_reason == ""
+
+
+def test_a_lockfile_without_members_is_left_alone(tmp_path: Path) -> None:
+    lock = tmp_path / "uv.lock"
+    lock.write_text("version = 1\n\n" + _pkg("click") + _pkg("colorama", "0.4.6"),
+                    encoding="utf-8")
+    envs, _ = parse_target_spec("python=3.10;platform=linux;arch=x86_64")
+    deps = scan_uv_lock(lock, target_envs=envs)
+    assert len(deps) == 2
+    assert all(d.scope != "excluded" for d in deps)
+
+
+def test_without_a_target_the_graph_is_not_even_built(tmp_path: Path) -> None:
+    lock = _ws(
+        tmp_path, '{ name = "click" }',
+        _pkg("click", deps='{ name = "colorama", marker = "sys_platform == \'win32\'" }')
+        + _pkg("colorama", "0.4.6"),
+    )
+    deps = {d.name: d for d in scan_uv_lock(lock)}
+    assert all(d.scope != "excluded" for d in deps.values())
+    assert all(d.markers == () for d in deps.values())
+
+
+def test_the_halves_agree_on_the_edge_rule() -> None:
+    """Pinned by value: the collector ships without the suite, so a
+    divergence must fail here and not at a customer.
+
+    Measured 15.10.2026 on the same real lockfile, both halves named the
+    same nine resolutions — six from package entries, three from edges.
+    """
+    envs, _ = parse_target_spec("python=3.10;platform=linux;arch=aarch64,x86_64")
+    from jochwacht_sbom.sbom.markers import evaluate
+
+    # The three edge conditions of that measurement, and their verdicts.
+    assert evaluate(["sys_platform == 'win32'"], envs).shipped is False
+    assert evaluate(["sys_platform == '_'"], envs).shipped is False
+    assert evaluate(["python_full_version >= '3.12'"], envs).shipped is False
+    # And the one that looks similar but holds — joblib's edge.
+    assert evaluate(["python_full_version < '3.11'"], envs).shipped is True

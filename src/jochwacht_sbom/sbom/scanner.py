@@ -496,6 +496,114 @@ def _strip_requirement_comment(line: str) -> str:
     return line[: treffer.start()].strip() if treffer else line.strip()
 
 
+def _normalise_package_name(name: str) -> str:
+    """PEP 503: ``Foo_Bar`` and ``foo.bar`` are the same project as ``foo-bar``.
+
+    ``.lower()`` alone made them three different nodes in the graph. uv
+    normalises, so all 15 lockfiles on this machine are unaffected — but an
+    unnormalised name produced a real false exclusion in a constructed case
+    (found in review), and that is the one error class this function must
+    never commit.
+    """
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
+def _mark_unreachable_under_markers(
+    deps: list[Dependency],
+    marked_edges: dict[str, list[tuple[str, str]]],
+    roots: set[str],
+    target_envs: list[TargetEnv],
+) -> None:
+    """Mark packages that only a false edge condition leads to.
+
+    uv writes a condition in two places: on the package entry
+    (``resolution-markers``, handled per entry) and on a dependency EDGE
+    (``dependencies = [{ name = "colorama", marker = "sys_platform ==
+    'win32'" }]``). Reading only the first missed the second kind — on the
+    measured lockfile (python=3.10, linux, x86_64) THREE packages reach the
+    bill solely through an edge no target environment satisfies: colorama
+    (win32), setuptools (>= 3.12) and opencv-python (uv's ``sys_platform ==
+    '_'`` idiom for "never", written by an ``override-dependencies`` entry).
+    An earlier count of five named joblib and threadpoolctl too; measured,
+    their edge is ``python_full_version < '3.11'``, which is TRUE for 3.10 —
+    they ship.
+
+    The difference of TWO traversals, not one. Reachability alone would also
+    catch every development dependency — mypy, ruff, playwright are
+    unreachable from the production roots for an entirely different reason,
+    and calling those "not shipped into your target environment" would be a
+    false statement about the customer's project (measured: 11 unreachable
+    without markers, 14 with — the difference of 3 is the marker effect).
+    So: reachable when markers are
+    ignored, NOT reachable when they are honoured. Only that difference is a
+    marker exclusion. This reader has no dev-scope closure at all (a
+    deliberate simplification of the twin), and the two-traversal rule is
+    exactly what makes that safe: development material is unreachable in
+    BOTH traversals, so it never appears in the difference.
+
+    In doubt, shipped: an undecidable edge marker counts as satisfiable.
+    """
+    def erreichbar(*, beachte_marker: bool) -> set[str]:
+        gesehen: set[str] = set()
+        rand = list(roots)
+        while rand:
+            knoten = rand.pop()
+            if knoten in gesehen:
+                continue
+            gesehen.add(knoten)
+            for kind, marker in marked_edges.get(knoten, []):
+                if kind in gesehen:
+                    continue
+                erfuellbar = (
+                    not beachte_marker
+                    or not marker
+                    or markers_mod.evaluate([marker], target_envs).shipped
+                )
+                if erfuellbar:
+                    rand.append(kind)
+        return gesehen
+
+    mit = erreichbar(beachte_marker=True)
+    nur_marker = erreichbar(beachte_marker=False) - mit
+    if not nur_marker:
+        return
+    ziele = "; ".join(e.label for e in target_envs)
+    for dep in deps:
+        schluessel = _normalise_package_name(dep.name)
+        if schluessel not in nur_marker or dep.scope:
+            continue
+        # Only the packages a FALSE edge points at may be told so. One that
+        # falls out because its parent does not ship gets the true reason
+        # instead — the first version said "only reached through a condition
+        # that is false" and printed a marker that was TRUE beside it
+        # (found in review). In a liability document a wrong reason is worse
+        # than no reason.
+        bedingungen = sorted({
+            m for eltern, kanten in marked_edges.items()
+            for kind, m in kanten
+            if kind == schluessel and m and eltern in mit
+        })
+        if bedingungen:
+            dep.scope_reason = (
+                f"only reached through a dependency condition that is false "
+                f"for every target environment ({ziele})"
+            )
+            # Never overwrite the entry's OWN resolution-markers: they are
+            # what the lockfile wrote at this entry, and replacing them with
+            # an edge condition loses the trace back to the file.
+            if not dep.markers:
+                dep.markers = tuple(bedingungen)
+        else:
+            dep.scope_reason = (
+                f"every package that depends on it is itself not shipped into "
+                f"any target environment ({ziele})"
+            )
+        dep.scope = "excluded"
+        # A component cannot be "counted as shipped" and excluded at once.
+        dep.marker_note = ""
+        logger.info("%s %s not shipped: %s", dep.name, dep.version, dep.scope_reason)
+
+
 def _apply_markers(
     dep: Dependency, roh: list[str], target_envs: list[TargetEnv] | None, path: Path,
 ) -> None:
@@ -535,13 +643,36 @@ def scan_uv_lock(
         logger.warning("Failed to parse %s: %s", path, exc)
         return deps
 
+    # Edges only when they are needed: the marker question. This reader
+    # still has no dev-scope closure — that difference to the suite is a
+    # deliberate simplification of the twin and stays.
+    marked_edges: dict[str, list[tuple[str, str]]] = {}
+    roots: set[str] = set()
+    members = 0
+
     for pkg in data.get("package", []):
         name = pkg.get("name", "")
         version = pkg.get("version", "")
         source = pkg.get("source", {})
+        kanten: list[tuple[str, str]] = []
+        if target_envs:
+            for gruppe in [pkg.get("dependencies") or []] + list(
+                (pkg.get("optional-dependencies") or {}).values()
+            ):
+                for rel in gruppe or []:
+                    if isinstance(rel, dict) and rel.get("name"):
+                        kanten.append((
+                            _normalise_package_name(str(rel["name"])),
+                            str(rel.get("marker") or ""),
+                        ))
+            if name:
+                marked_edges.setdefault(
+                    _normalise_package_name(name), []).extend(kanten)
         if isinstance(source, dict) and (
             "editable" in source or "virtual" in source or "directory" in source
         ):
+            members += 1
+            roots.update(k for k, _ in kanten)
             continue
         if name and version:
             dep = Dependency(
@@ -555,6 +686,9 @@ def scan_uv_lock(
             roh = [str(m) for m in (pkg.get("resolution-markers") or []) if str(m).strip()]
             _apply_markers(dep, roh, target_envs, path)
             deps.append(dep)
+
+    if target_envs and members and roots:
+        _mark_unreachable_under_markers(deps, marked_edges, roots, target_envs)
 
     logger.info("Found %d dependencies in %s", len(deps), path)
     return deps
