@@ -1,10 +1,5 @@
 """PEP 508 environment markers against the environments we actually ship.
 
-Ported from the suite (jochwacht 0.17.0, 14.10.2026) and deliberately kept
-identical: the two halves must agree about what ships, or a customer who
-runs the free check and one who runs the suite get different answers about
-the same lockfile.
-
 A Python lockfile holds the resolution for *every* environment the resolver
 considered, not for the one that leaves the house. ``uv.lock`` says so
 openly: one package entry per resolution, each with its own
