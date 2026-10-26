@@ -25,6 +25,13 @@ pytest.importorskip(
     "cyclonedx.validation.json",
     reason="cyclonedx-python-lib is the foreign cross-check; install .[dev]",
 )
+# The validator itself is behind the library's "validation" extra: without
+# jsonschema the import above still succeeds and the failure only surfaces
+# at validate time, as a bare ModuleNotFoundError that reads like our bug.
+pytest.importorskip(
+    "jsonschema",
+    reason="needs cyclonedx-python-lib[validation]; install .[dev]",
+)
 from cyclonedx.schema import SchemaVersion  # noqa: E402
 from cyclonedx.validation.json import JsonStrictValidator  # noqa: E402
 
