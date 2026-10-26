@@ -28,6 +28,7 @@ from typing import TYPE_CHECKING
 
 from jochwacht_sbom import __version__, properties
 from jochwacht_sbom.core.exceptions import JochwachtError
+from jochwacht_sbom.licenses import cyclonedx_licenses
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -62,7 +63,12 @@ def _component(comp: CheckComponent) -> dict[str, object]:
     if comp.supplier:
         out["supplier"] = {"name": comp.supplier}
     if comp.license:
-        out["licenses"] = [{"license": {"id": comp.license}}]
+        # Not straight into ``license.id``: that field takes an SPDX
+        # identifier and nothing else. "BSD License" — what a PyPI
+        # classifier yields — made the whole document invalid.
+        licenses = cyclonedx_licenses(comp.license)
+        if licenses:
+            out["licenses"] = licenses
     # A conditional alternative is OPTIONAL, never required: no default build
     # contains it, and mutually exclusive ones never both ship (Befund 44).
     if comp.condition:

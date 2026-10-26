@@ -107,3 +107,52 @@ def test_the_switch_reaches_the_written_file(tmp_path: Path) -> None:
     doc = json.loads(out.read_text(encoding="utf-8"))
     assert doc["specVersion"] == "1.7"
     assert JsonStrictValidator(SchemaVersion.V1_7).validate_str(json.dumps(doc)) is None
+
+
+@pytest.mark.parametrize("spec", SPEC_VERSIONS)
+@pytest.mark.parametrize("stated", ["BSD License", "MIT", "mit", "Apache-2.0 OR MIT", "unknown"])
+def test_whatever_a_build_file_states_the_bill_stays_valid(spec: str, stated: str) -> None:
+    """``license.id`` takes an SPDX identifier and nothing else.
+
+    "BSD License" is what a PyPI classifier yields, and it used to go
+    straight into that field — which made the customer's whole bill invalid
+    against the published schema. Measured 2026-10-26.
+    """
+    doc = build_cyclonedx(
+        [CheckComponent(name="jinja2", version="3.1.2", ecosystem="pypi", license=stated)],
+        CheckStats(), project_name="probe", spec_version=spec,
+    )
+    err = JsonStrictValidator(SCHEMA[spec]).validate_str(json.dumps(doc))
+    assert err is None, f"{stated!r} in CycloneDX {spec}: {err}"
+
+
+@pytest.mark.parametrize(
+    ("stated", "expected"),
+    [
+        ("BSD License", {"license": {"name": "BSD License"}}),
+        ("MIT", {"license": {"id": "MIT"}}),
+        ("mit", {"license": {"id": "MIT"}}),
+        ("Apache-2.0 OR MIT", {"expression": "Apache-2.0 OR MIT"}),
+    ],
+)
+def test_wording_goes_to_the_field_that_fits_it(stated: str, expected: dict) -> None:
+    from jochwacht_sbom.licenses import cyclonedx_licenses
+
+    assert cyclonedx_licenses(stated) == [expected]
+
+
+def test_the_vendored_list_matches_the_one_the_schemas_carry() -> None:
+    """An identifier can be right per SPDX and still fail validation."""
+    import importlib.resources as resources
+
+    import cyclonedx.schema._res as schema_res
+
+    from jochwacht_sbom.licenses import _spdx_identifiers, spdx_license_list_version
+
+    spdx_schema = json.loads(
+        resources.files(schema_res)
+        .joinpath("spdx.SNAPSHOT.schema.json")
+        .read_text(encoding="utf-8"),
+    )
+    assert set(_spdx_identifiers().values()) <= set(spdx_schema["enum"])
+    assert spdx_license_list_version() in str(spdx_schema.get("$comment", ""))

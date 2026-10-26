@@ -1,6 +1,6 @@
 [project]
 name = "jochwacht-sbom"
-version = "0.15.0"
+version = "0.16.0"
 description = "SBOM generation for embedded builds — CMake, Meson, Autotools, Yocto, Buildroot, Zephyr, vcpkg — one command writes a CycloneDX bill of materials from your build; sends nothing unless you say so."
 readme = "README.md"
 license = { file = "LICENSE" }
