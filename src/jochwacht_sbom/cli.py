@@ -24,7 +24,12 @@ from jochwacht_sbom import __version__, diagnosis, env, filenames
 from jochwacht_sbom.collector import collect_components
 from jochwacht_sbom.core.exceptions import JochwachtError
 from jochwacht_sbom.payload import CheckPayload, build_payload
-from jochwacht_sbom.sbom_out import classify_existing, write_cyclonedx
+from jochwacht_sbom.sbom_out import (
+    SPEC_VERSION,
+    SPEC_VERSIONS,
+    classify_existing,
+    write_cyclonedx,
+)
 from jochwacht_sbom.upload import DEFAULT_SUBMIT_URL, serialize_payload, upload_payload
 
 _PRIVACY_URL = "https://jochwacht.dev/check-privacy"
@@ -78,6 +83,16 @@ _stdout = Console(soft_wrap=True)
 )
 @click.option("--voucher", default="",
               help="Optional partner / campaign code (tracking only).")
+@click.option(
+    "--cyclonedx",
+    "spec_version",
+    type=click.Choice(list(SPEC_VERSIONS)),
+    default=SPEC_VERSION,
+    show_default=True,
+    help="CycloneDX version of the bill written locally. 1.7 is the current "
+         "specification (released 2025-10, ECMA-424 2nd edition); 1.6 is the "
+         "minimum BSI TR-03183-2 v2.1.0 accepts and what most tooling reads.",
+)
 @click.option(
     "--lang", type=click.Choice(["de", "en"]), default=None,
     help="Report language. Default: the language of the landing page "
@@ -144,6 +159,7 @@ def main(  # noqa: PLR0913 — CLI surface, mirrors documented flags
     sbom_path: Path | None,
     code: str,
     voucher: str,
+    spec_version: str,
     lang: str | None,
     target_env: str,
     contact_email: str,
@@ -172,6 +188,7 @@ def main(  # noqa: PLR0913 — CLI surface, mirrors documented flags
             never_send=never_send,
             assume_yes=assume_yes,
             sbom_path=sbom_path,
+            spec_version=spec_version,
             code=code,
             voucher=voucher,
             lang=lang,
@@ -292,6 +309,7 @@ def _run(  # noqa: PLR0913 — mirrors the CLI surface
     sbom_path: Path | None = None,
     code: str,
     voucher: str,
+    spec_version: str = SPEC_VERSION,
     lang: str | None = None,
     target_env: str = "",
     contact_email: str,
@@ -593,6 +611,7 @@ def _run(  # noqa: PLR0913 — mirrors the CLI surface
         components,
         stats,
         project_name=path.resolve().name,
+        spec_version=spec_version,
     )
     path_arg = "." if path.resolve() == Path.cwd().resolve() else str(path)
 

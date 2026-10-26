@@ -66,7 +66,8 @@ Buildroot, Zephyr modules, vcpkg manifests. That is what jochwacht-sbom reads.
 
 **What you get:**
 
-- A CycloneDX 1.6 bill of materials from your **build**, not just from lockfiles —
+- A CycloneDX bill of materials from your **build**, not just from lockfiles —
+  1.6 by default, `--cyclonedx 1.7` for the current specification —
   including the C/C++ worlds that have no package manager. Versions of system
   libraries come from the linked system (pkg-config), never guessed.
 - **License and supplier** filled in on the free report for the components we can

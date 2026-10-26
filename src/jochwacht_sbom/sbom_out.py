@@ -1,9 +1,10 @@
-"""CycloneDX 1.6 output — the customer's own result, written locally.
+"""CycloneDX output (1.6 by default, 1.7 on request) — the customer's own
+result, written locally.
 
 Order collector-transparent-machen (Ivan, 09.09.2026): the default run
 GENERATES, SHOWS and SAVES; it uploads nothing. What it saves must be a real
 SBOM the customer can use with any other tool — not our upload payload. So
-this writer emits CycloneDX 1.6 JSON from the same components the check
+this writer emits CycloneDX JSON from the same components the check
 collected, with the honest markings the suite uses:
 
 - ``scope`` travels ("excluded" = test material / build tooling — listed,
@@ -33,7 +34,19 @@ if TYPE_CHECKING:
 
     from jochwacht_sbom.payload import CheckComponent, CheckStats
 
-#: CycloneDX spec version we emit.
+#: CycloneDX spec versions this tool emits.
+#:
+#: 1.7 was released in October 2025 (ECMA-424, 2nd edition) and is backward
+#: compatible with 1.4-1.6. The document this writer produces is identical
+#: either way apart from the ``specVersion`` string — it uses only fields
+#: both versions define the same way.
+SPEC_VERSIONS: tuple[str, ...] = ("1.6", "1.7")
+
+#: What we emit when the caller says nothing.
+#:
+#: Stays at 1.6: that is the minimum BSI TR-03183-2 v2.1.0 section 4 names,
+#: and it is what the installed base of customer tooling reads. A default is
+#: a promise to whoever passes no flag.
 SPEC_VERSION = "1.6"
 
 
@@ -93,12 +106,28 @@ def build_cyclonedx(
     stats: CheckStats,
     *,
     project_name: str,
+    spec_version: str = SPEC_VERSION,
 ) -> dict[str, object]:
-    """Build the CycloneDX 1.6 document for *components*."""
+    """Build the CycloneDX document for *components*.
+
+    Args:
+        components: What the check collected.
+        stats: Run statistics; supplies the lifecycle phase.
+        project_name: Name for ``metadata.component``.
+        spec_version: One of :data:`SPEC_VERSIONS`.
+
+    Raises:
+        JochwachtError: On a version this tool does not emit.
+    """
+    if spec_version not in SPEC_VERSIONS:
+        raise JochwachtError(
+            f"Unsupported CycloneDX version: {spec_version!r}. "
+            f"Use one of {', '.join(SPEC_VERSIONS)}."
+        )
     lifecycle = stats.lifecycle or "design"
     return {
         "bomFormat": "CycloneDX",
-        "specVersion": SPEC_VERSION,
+        "specVersion": spec_version,
         "serialNumber": f"urn:uuid:{uuid.uuid4()}",
         "version": 1,
         "metadata": {
@@ -172,6 +201,7 @@ def write_cyclonedx(
     stats: CheckStats,
     *,
     project_name: str,
+    spec_version: str = SPEC_VERSION,
 ) -> Path:
     """Write the SBOM to *path*.
 
@@ -191,7 +221,9 @@ def write_cyclonedx(
             f"untouched. Write the bill elsewhere with --sbom PATH.",
             exit_code=1,
         )
-    doc = build_cyclonedx(components, stats, project_name=project_name)
+    doc = build_cyclonedx(
+        components, stats, project_name=project_name, spec_version=spec_version,
+    )
     path.write_text(
         json.dumps(doc, indent=2, ensure_ascii=False) + "\n", encoding="utf-8",
     )

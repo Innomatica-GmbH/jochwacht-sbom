@@ -30,6 +30,10 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    # Foreign cross-check: it ships the published CycloneDX schemas, so our
+    # output is judged by the specification, not by our own expectations.
+    # 11.12 is the version measured to know 1.7.
+    "cyclonedx-python-lib>=11.12",
     "pytest>=8.0",
     "ruff>=0.16,<0.17",
     "mypy>=1.10",
