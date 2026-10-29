@@ -36,8 +36,12 @@ _ANDERS_BENANNT = [
     "embt" + "race" + "-deps.yaml",
     "acme-deps.yaml",
     "jochwach-deps.yaml",      # Tippfehler — vorher unsichtbar
-    "Jochwacht-deps.yaml",     # falsche Schreibweise, exakt verglichen
 ]
+
+#: Nur die Gross-/Kleinschreibung unterscheidet sich. Ob das eine ANDERE
+#: Datei ist, entscheidet das Dateisystem und nicht wir — siehe den Test
+#: darunter.
+_NUR_ANDERE_SCHREIBWEISE = "Jochwacht-deps.yaml"
 
 
 @pytest.mark.parametrize("name", _ANDERS_BENANNT)
@@ -46,6 +50,32 @@ def test_a_differently_named_declaration_file_is_reported(
 ) -> None:
     (tmp_path / name).write_text("x\n", encoding="utf-8")
     assert filenames.declaration_file_not_read(tmp_path) == [(name, filenames.DEPS)]
+
+
+def test_a_name_differing_only_in_case_follows_the_file_system(tmp_path: Path) -> None:
+    """Gemeldet wird, was NICHT GELESEN wird — und das sagt das Dateisystem.
+
+    Auf Linux ist ``Jochwacht-deps.yaml`` eine andere Datei als
+    ``jochwacht-deps.yaml``: sie wird nicht gelesen, also wird sie gemeldet.
+    Auf Windows und macOS ist es DIESELBE Datei — ein ``open`` auf unseren
+    Namen öffnet sie, die Erklärungen gehen also gar nicht verloren, und eine
+    Meldung wäre falsch.
+
+    Gefunden am 29.10.2026 von der Windows-Matrix der CI, nachdem der Test
+    hier die Linux-Antwort als die einzige behauptet hatte (Lauf
+    40912477657, ``windows-latest, 3.12``, 1 von 244 rot). Der Test fragt
+    deshalb jetzt das Dateisystem, statt eine Plattform zu raten — ``sys.platform``
+    stünde hier für eine Annahme, ``is_file()`` ist eine Messung.
+    """
+    (tmp_path / _NUR_ANDERE_SCHREIBWEISE).write_text("x\n", encoding="utf-8")
+    liest_sie_schon = (tmp_path / filenames.DEPS).is_file()
+    gemeldet = filenames.declaration_file_not_read(tmp_path)
+    if liest_sie_schon:
+        assert gemeldet == [], (
+            "das Dateisystem unterscheidet die Schreibweise nicht — die Datei WIRD"
+            " gelesen, eine Meldung waere falsch")
+    else:
+        assert gemeldet == [(_NUR_ANDERE_SCHREIBWEISE, filenames.DEPS)]
 
 
 def test_nothing_is_reported_for_a_clean_project(tmp_path: Path) -> None:

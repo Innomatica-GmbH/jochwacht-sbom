@@ -52,6 +52,13 @@ def both(name: str) -> tuple[str, ...]:
 #: gemessene Verlust vom 05.10.2026 die ERKLAERUNGSdatei betraf: sie traegt
 #: Angaben, die sonst nirgends stehen, waehrend eine fehlende Konfiguration
 #: nur Vorgaben bedeutet.
+#:
+#: **Gross-/Kleinschreibung richtet sich nach dem Dateisystem, und das ist
+#: richtig so.** ``(directory / DEPS).is_file()`` ist auf Windows und macOS
+#: fuer ``Jochwacht-deps.yaml`` wahr — dieselbe Datei, sie WIRD gelesen, es
+#: geht nichts verloren, eine Meldung waere falsch. Auf Linux ist es eine
+#: andere Datei und wird gemeldet. Gefunden hat das die Windows-Matrix der CI
+#: am 29.10.2026, nicht der Entwurf.
 _DEKLARATIONS_MUSTER = "*-deps.yaml"
 
 
