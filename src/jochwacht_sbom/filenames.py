@@ -31,32 +31,42 @@ def both(name: str) -> tuple[str, ...]:
     return (name,)
 
 
-#: What a customer may still have on disk under the spelling of the former
-#: product name, and the name it must carry now. We deliberately do NOT read
-#: these: the move of 01.10.2026 is complete, without a compatibility layer.
+#: Eine von Hand erklaerte Abhaengigkeit, die stillschweigend unter den Tisch
+#: faellt, ist ein Messverlust, den niemand bemerkt — und "nichts passiert
+#: still" ist das Versprechen dieses Werkzeugs. Gemessen am 05.10.2026: ein
+#: Projekt, das seine Erklaerungen nur unter einem anderen Dateinamen liegen
+#: hatte, erzeugte eine Stueckliste mit null erklaerten Komponenten und ohne
+#: ein Wort dazu.
 #:
-#: But a hand-written declaration that is ignored in silence is a measurement
-#: loss nobody notices — and "nothing happens silently" is this tool's own
-#: promise. Measured 05.10.2026: a project holding only the former
-#: ``*-deps.yaml`` produced a bill with zero declared components and no word
-#: about it. So we look for them in order to SAY so, and only for that.
-_FORMER_SPELLINGS = {
-    CONFIG: "embtrace.yaml",        # alter-name-als-datum
-    DEPS: "embtrace-deps.yaml",     # alter-name-als-datum
-    IGNORE: ".embtraceignore",      # alter-name-als-datum
-}
+#: Bis zum 29.10.2026 wurde dafuer auf drei feste Namen geprueft — die des
+#: vorherigen Produkts. Seit Ivans Entscheidung ("es darf kein alter Name
+#: mehr geben, egal wo") nennt diese Pruefung keinen Namen mehr, sondern
+#: beschreibt die FORM: eine Datei, die wie eine Erklaerungsdatei aussieht,
+#: aber nicht so heisst, wie wir sie lesen.
+#:
+#: **Grenze, die man kennen muss.** Verallgemeinern laesst sich nur die
+#: Erklaerungsdatei. Fuer die Projektkonfiguration (``*.yaml``) und die
+#: Ausschlussliste (``.*ignore``) gibt es keine Form, die nicht massenhaft
+#: Falschmeldungen erzeugte — ``.gitignore`` waere eine davon. Die beiden
+#: Faelle werden also NICHT mehr gemeldet. Das ist vertretbar, weil der
+#: gemessene Verlust vom 05.10.2026 die ERKLAERUNGSdatei betraf: sie traegt
+#: Angaben, die sonst nirgends stehen, waehrend eine fehlende Konfiguration
+#: nur Vorgaben bedeutet.
+_DEKLARATIONS_MUSTER = "*-deps.yaml"
 
 
-def former_spelling_present(directory: Path) -> list[tuple[str, str]]:
-    """``[(file that is there, name it needs)]`` for files we will NOT read.
+def declaration_file_not_read(directory: Path) -> list[tuple[str, str]]:
+    """``[(Datei die da ist, Name den sie braucht)]`` fuer Erklaerungsdateien,
+    die wir NICHT lesen, weil sie anders heissen.
 
-    Empty when the directory holds none — the normal case.
+    Leer, wenn das Verzeichnis keine solche traegt — der Normalfall.
     """
-    found = []
-    for current, former in _FORMER_SPELLINGS.items():
-        if (directory / former).is_file() and not (directory / current).is_file():
-            found.append((former, current))
-    return found
+    if (directory / DEPS).is_file():
+        return []
+    gefunden = sorted(
+        p.name for p in directory.glob(_DEKLARATIONS_MUSTER) if p.is_file()
+    )
+    return [(name, DEPS) for name in gefunden]
 
 
 def find(directory: Path, name: str) -> Path | None:

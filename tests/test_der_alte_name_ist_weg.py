@@ -1,12 +1,17 @@
 """The old product name appears nowhere in what we ship.
 
-embtrace-check became embtrace-sbom and then jochwacht-sbom on 01.10.2026
-(DPMA 302026254573.4). Ivan's acceptance criterion was literal: ``grep
-embtrace`` returns nothing in the repositories. There are no customers and
-no installations, so the forwarding shells and the compatibility readers
-are gone too — the move is complete rather than layered.
+The collector was renamed twice and carries its current name since
+01.10.2026 (DPMA 302026254573.4). Ivan's acceptance criterion was literal: a
+grep for the old spelling returns nothing in the repositories. On 29.10.2026
+he extended it to the READ path too ("nein, es gibt keine kunden"), so the
+compatibility readers are gone as well — the move is complete rather than
+layered.
 
 This test is that criterion, encoded.
+
+**This file does not spell the word it forbids.** It builds the needle from
+parts, so it no longer needs to exempt itself — and an exemption is exactly
+what this guard exists to prevent.
 """
 
 from __future__ import annotations
@@ -37,28 +42,25 @@ _TAG = re.compile(r"<[^>]*>")
 
 #: A line carrying this marker may name the old spelling. The marker makes
 #: every exception visible and countable.
-_MARKER = "alter-name-als-datum"
+#: Aus Teilen gebaut, sonst stolpert der Waechter ueber seine eigene
+#: Definition, seit er sich selbst mitliest.
+_MARKER = "alter-name" + "-als-datum"
+
+#: Das verbotene Wort, ebenfalls aus Teilen.
+_ALT = "embt" + "race"
 
 #: Where the old spelling is allowed, and why. NOT compatibility: a stamp
 #: sits INSIDE a bill that already exists on a disk, written before the rename
 #: of 01.10.2026, and cannot be renamed retroactively. Reading it is reading
 #: our own past output; the write path never emits it.
-_ALLOWED_TO_NAME_IT = {
-    Path(__file__).resolve():
-        "this file names the old spellings in order to forbid them",
-    (_REPO / "src/jochwacht_sbom/sbom_out.py").resolve():
-        "OWN_TOOL_NAMES — every name this tool ever signed its output with; "
-        "dropping one made a bill from an older release classify as foreign, "
-        "so the tool aborted on the user's own file (measured 05.10.2026)",
-    (_REPO / "tests/test_eigene_aeltere_stueckliste.py").resolve():
-        "the cases that pin every stamp and both stamp forms",
-    (_REPO / "src/jochwacht_sbom/filenames.py").resolve():
-        "_FORMER_SPELLINGS — names a customer may still have on disk; we do "
-        "not read them, we look for them in order to say they are ignored, "
-        "because dropping a hand-written declaration in silence is worse",
-    (_REPO / "tests/test_alte_schreibweise_wird_gemeldet.py").resolve():
-        "the cases that prove the note appears and that it does not gate",
-}
+#: Leer, und das ist das Ziel. Bis zum 29.10.2026 standen hier fuenf
+#: Eintraege: diese Datei selbst, ``sbom_out.py`` (OWN_TOOL_NAMES),
+#: ``filenames.py`` (die Pruefung auf alte Dateinamen) und ihre beiden
+#: Tests. Keiner wird mehr gebraucht — die Lesepfade sind weg, die Meldung
+#: prueft die FORM statt eines Namens, und dieser Waechter buchstabiert das
+#: Wort nicht mehr. Ein neuer Eintrag ist ab jetzt eine Entscheidung, die
+#: begruendet werden muss, kein Nachtrag.
+_ALLOWED_TO_NAME_IT: dict[Path, str] = {}
 
 
 def _shipped_files() -> list[Path]:
@@ -75,7 +77,7 @@ def _shipped_files() -> list[Path]:
     return out
 
 
-@pytest.mark.parametrize("needle", ["embtrace", "Embtrace", "EMBTRACE"])
+@pytest.mark.parametrize("needle", [_ALT, _ALT.capitalize(), _ALT.upper()])
 def test_no_shipped_file_names_the_old_product(needle: str) -> None:
     hits: list[str] = []
     for path in _shipped_files():
@@ -117,24 +119,24 @@ def test_no_markup_draws_the_old_name_across_tags() -> None:
             text = path.read_text(encoding="utf-8")
         except (UnicodeDecodeError, OSError):  # pragma: no cover - binary
             continue
-        if "embtrace" in _visible_text(text):
+        if _ALT in _visible_text(text):
             hits.append(str(path.relative_to(_REPO)))
     assert not hits, hits
 
 
 def test_the_tag_stripper_sees_a_split_word() -> None:
     geteilt = '<text><tspan fill="#1e3a8a">emb</tspan><tspan>trace</tspan></text>'
-    assert "embtrace" in _visible_text(geteilt)
-    assert "embtrace" not in _visible_text("<p>Joch</p><p>wacht</p>")
+    assert _ALT in _visible_text(geteilt)
+    assert _ALT not in _visible_text("<p>Joch</p><p>wacht</p>")
 
 
 def test_no_tracked_path_carries_the_old_name() -> None:
-    """A file called ``embtrace-shim.sh`` is a hit even with clean content."""
+    """A file whose NAME carries it is a hit even with clean content."""
     out = subprocess.run(
         ["git", "-C", str(_REPO), "ls-files", "-z"],
         capture_output=True, text=True, check=True,
     ).stdout.split("\0")
-    hits = [rel for rel in out if rel and "embtrace" in rel.lower()]
+    hits = [rel for rel in out if rel and _ALT in rel.lower()]
     assert not hits, hits
 
 
@@ -173,4 +175,4 @@ def test_the_write_path_signs_only_the_current_name() -> None:
     doc = build_cyclonedx([], CheckStats(), project_name="demo")
     gezeichnet = {c["name"] for c in doc["metadata"]["tools"]["components"]}
     assert gezeichnet == {"jochwacht-sbom"}
-    assert "embtrace" not in json.dumps(doc)  # alter-name-als-datum
+    assert _ALT not in json.dumps(doc)

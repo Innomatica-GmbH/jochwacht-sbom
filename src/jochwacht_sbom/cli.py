@@ -358,11 +358,11 @@ def _run(  # noqa: PLR0913 — mirrors the CLI surface
 
     console.print(f"[bold]jochwacht-sbom[/bold] {__version__} — scanning {path.resolve().name}/")
 
-    # A file the customer wrote under the former product name is NOT read —
-    # the move is complete, without a layer. Saying nothing about it would
-    # drop a hand-written declaration in silence, which is the one thing this
-    # tool promises never to do.
-    for found, needed in filenames.former_spelling_present(path):
+    # Eine Erklaerungsdatei, die anders heisst, wird NICHT gelesen. Sie
+    # stillschweigend zu uebergehen waere das Einzige, was dieses Werkzeug
+    # nie tun will: eine von Hand eingetragene Angabe verlieren, ohne es zu
+    # sagen. Geprueft wird die FORM, nicht ein bestimmter Name.
+    for found, needed in filenames.declaration_file_not_read(path):
         console.print(
             f"[yellow]Note:[/yellow] {found} is present and is [bold]not[/bold] "
             f"read — this tool only reads {needed}. Rename it "

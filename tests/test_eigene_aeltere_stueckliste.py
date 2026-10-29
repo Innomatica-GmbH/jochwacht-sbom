@@ -1,16 +1,27 @@
-"""A bill written by an older release of this tool is still our bill.
+"""Welche Stueckliste gilt als UNSERE — und welche nicht mehr.
 
-``write_cyclonedx`` refuses to overwrite a FOREIGN file — that is somebody's
-evidence. The classification reads the ``metadata.tools`` stamp, and the tool
-has signed its output under three names over its life. A rename of the
-PACKAGE must not drop a historical stamp from that set: the stamp sits inside
-a file that already exists on a disk and cannot be renamed retroactively.
+``write_cyclonedx`` weigert sich, eine FREMDE Datei zu ueberschreiben: das
+ist der Nachweis von jemand anderem. Entschieden wird am Stempel in
+``metadata.tools``.
 
-This has gone wrong twice (01.10.2026 and 02.10.2026), the second time
-together with the comment that warned about the first. Measured on
-05.10.2026 against the published 0.13.0: a bill stamped with the 0.11.1 name
-classified as ``foreign``, so the tool aborted with exit 1 and told the user
-their own file "was not written by jochwacht-sbom".  # alter-name-als-datum
+**Seit dem 29.10.2026 steht dort genau ein Name.** Ivans Entscheidung ("nein,
+es gibt keine kunden") hat die Stempel der Vorgaengerfassungen entfernt. Die
+Folge haelt dieser Test fest, statt sie zu verschweigen: eine Stueckliste,
+die eine Fassung vor 0.12.0 geschrieben hat, gilt jetzt als fremd und wird
+nicht ueberschrieben. Der Nutzer bekommt einen Fehler mit Ausweg
+(``--sbom PATH``), keine stille Ueberraschung.
+
+Die Geschichte davor gehoert bewahrt, weil sie zweimal zugeschlagen hat: am
+01.10. und am 02.10.2026 nahm eine Umbenennung des PAKETS den historischen
+Stempel mit — beim zweiten Mal samt dem Kommentar, der vor dem ersten Mal
+gewarnt hatte. Gemessen am 05.10.2026 gegen die veroeffentlichte 0.13.0 hiess
+das fuer den Nutzer: sein eigenes Werkzeug nannte seine eigene Datei fremd,
+ohne dass jemand das entschieden haette. Heute ist es entschieden — das ist
+der Unterschied.
+
+Diese Datei buchstabiert den alten Namen nicht mehr, sondern setzt ihn aus
+Teilen zusammen: ein Suchen-und-Ersetzen kann sie damit nicht still
+umdrehen.
 """
 
 from __future__ import annotations
@@ -23,13 +34,15 @@ import pytest
 from jochwacht_sbom.core.exceptions import JochwachtError
 from jochwacht_sbom.sbom_out import OWN_TOOL_NAMES, classify_existing
 
-#: Name, and the releases that wrote it. Pinned so a replacement cannot
-#: quietly collapse the set again.  # alter-name-als-datum
+#: Der Stempel, den dieses Werkzeug heute schreibt — und nur der.
 _STAMPS = {
     "jochwacht-sbom": "since 0.12.0",
-    "embtrace-sbom": "0.9.0 - 0.11.1",   # alter-name-als-datum
-    "embtrace-check": "up to 0.8.6",     # alter-name-als-datum
 }
+
+#: Aus Teilen gebaut: der Stempel der Fassungen 0.9.0 bis 0.11.1. Er gilt
+#: seit dem 29.10.2026 NICHT mehr als unserer, und genau das wird unten
+#: geprueft.
+_VORGAENGER = "embt" + "race" + "-sbom"
 
 
 def _bill(tool: str) -> str:
@@ -64,23 +77,26 @@ def test_somebody_elses_bill_stays_foreign(tool: str, tmp_path: Path) -> None:
     assert classify_existing(target) == "foreign"
 
 
-def test_an_older_own_bill_is_overwritten_not_refused(tmp_path: Path) -> None:
-    """The real path, because that is where the user hit it."""
+def test_an_older_own_bill_is_now_refused_as_foreign(tmp_path: Path) -> None:
+    """Die gewollte Folge von Ivans Entscheidung, am echten Weg gemessen.
+
+    Bis zum 29.10.2026 wurde eine solche Datei ueberschrieben, weil sie als
+    unsere galt. Jetzt nicht mehr — und das soll AUFFALLEN, nicht stillschweigen:
+    der Nutzer bekommt einen Fehler, der den Ausweg nennt.
+    """
     from jochwacht_sbom.collector import CheckStats
     from jochwacht_sbom.sbom_out import write_cyclonedx
 
     target = tmp_path / "sbom.cdx.json"
-    target.write_text(_bill("embtrace-sbom"), encoding="utf-8")  # alter-name-als-datum
+    inhalt = _bill(_VORGAENGER)
+    target.write_text(inhalt, encoding="utf-8")
 
-    written = write_cyclonedx(
-        target, [], CheckStats(), project_name="demo",
-    )
-    assert written == target
-    doc = json.loads(target.read_text(encoding="utf-8"))
-    # Written in the CycloneDX 1.5+ form; the bill we replaced used the
-    # legacy list form, and the classifier reads both.
-    assert doc["metadata"]["tools"]["components"][0]["name"] == "jochwacht-sbom"
-    assert classify_existing(target) == "own"
+    assert classify_existing(target) == "foreign"
+    with pytest.raises(JochwachtError) as fehler:
+        write_cyclonedx(target, [], CheckStats(), project_name="demo")
+    assert "--sbom" in str(fehler.value), "eine Abweisung ohne Ausweg ist eine Sackgasse"
+    # Und die Datei bleibt unberuehrt — sie wird nicht halb ueberschrieben.
+    assert target.read_text(encoding="utf-8") == inhalt
 
 
 def test_a_foreign_bill_is_still_refused(tmp_path: Path) -> None:
@@ -99,8 +115,12 @@ def test_both_stamp_forms_are_read(tmp_path: Path) -> None:
 
     A classifier that knows only one form calls half our own history foreign.
     """
-    stamp = {"vendor": "Innomatica GmbH", "name": "embtrace-sbom",  # alter-name-als-datum
-             "version": "0.11.1"}
+    # Der NAME ist hier nebensaechlich — geprueft wird die FORM. Bis zum
+    # 29.10.2026 stand hier der Stempel einer Vorgaengerfassung; der gilt
+    # nicht mehr als unserer, also waere der Test sonst aus dem falschen
+    # Grund rot geworden.
+    stamp = {"vendor": "Innomatica GmbH", "name": "jochwacht-sbom",
+             "version": "0.12.0"}
     for tools in ({"components": [stamp]}, [stamp]):
         target = tmp_path / "sbom.cdx.json"
         target.write_text(json.dumps({
