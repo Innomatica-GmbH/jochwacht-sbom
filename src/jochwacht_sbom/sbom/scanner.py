@@ -29,6 +29,8 @@ import binascii
 import json
 import os
 import re
+import shutil
+import subprocess
 import tomllib
 import xml.etree.ElementTree as ET
 from collections.abc import Callable
@@ -103,6 +105,12 @@ class Dependency(BaseModel):
     purl: str | None = None
     cpe: str | None = None
     description: str | None = None
+    #: Go only: True when the versions could not be resolved to the LINKED
+    #: set (no toolchain / no buildable package / error) and the scan fell
+    #: back to go.sum, which lists ALL versions including superseded ones.
+    #: The collector carries this into the payload so the server records the
+    #: note (CRA, Ivan 30.10.2026).
+    versions_unresolved: bool = False
     # Provenance class of the version: "" = resolved/pinned (lockfile or
     # exact pin), "manifest" = a constraint-derived minimum from a manifest
     # (pyproject `>=`, requirements `>=`, CMake find_package). Manifest
@@ -1299,6 +1307,163 @@ def scan_go_sum(path: Path) -> list[Dependency]:
     return deps
 
 
+_GO_EXCLUDE_SEGMENTS = frozenset({"testdata", "examples", "example"})
+
+
+def _run_go(args: list[str], cwd: Path, timeout: float = 180.0) -> tuple[bool, str]:
+    """Run ``go <args>`` in *cwd*, non-writing (``-mod=readonly``). (ok, stdout)."""
+    if shutil.which("go") is None:
+        return False, ""
+    try:
+        proc = subprocess.run(  # noqa: S603,S607 — fixed args, no user text
+            ["go", *args], cwd=str(cwd), capture_output=True, text=True,
+            timeout=timeout, env={**os.environ, "GOFLAGS": "-mod=readonly"},
+        )
+    except (subprocess.SubprocessError, OSError) as exc:
+        logger.info("go %s unusable (%s)", args[0] if args else "", exc)
+        return False, ""
+    if proc.returncode != 0:
+        logger.info("go %s exit %s: %s", " ".join(args[:2]),
+                    proc.returncode, proc.stderr[:200])
+        return False, ""
+    return True, proc.stdout
+
+
+def _go_packages(directory: Path) -> list[tuple[str, str]] | None:
+    """All buildable packages of the module as (name, import path).
+
+    ``go list ./...`` skips testdata and ``_``/``.`` directories itself and
+    honours build tags. ``None`` = go unusable (fall back); an EMPTY list = a
+    module with no buildable package (only go.mod/go.sum, no source) → the
+    caller falls back to go.sum, since no linked set can be derived from
+    nothing.
+    """
+    ok, out = _run_go(
+        ["list", "-f", "{{.Name}}\t{{.ImportPath}}", "./..."], directory,
+    )
+    if not ok:
+        return None
+    pkgs: list[tuple[str, str]] = []
+    for line in out.splitlines():
+        parts = line.split("\t")
+        if len(parts) != 2:
+            continue
+        pkgs.append((parts[0].strip(), parts[1].strip()))
+    return pkgs
+
+
+def _go_main_packages(pkgs: list[tuple[str, str]]) -> list[str]:
+    """The ``package main`` from *pkgs*, without testdata/examples/_ dirs."""
+    mains: list[str] = []
+    for name, path in pkgs:
+        if name != "main" or not path:
+            continue
+        segs = path.split("/")
+        if any(seg in _GO_EXCLUDE_SEGMENTS or (seg.startswith("_") and len(seg) > 1)
+               for seg in segs):
+            continue
+        mains.append(path)
+    return mains
+
+
+def _go_deps_modules(
+    directory: Path, targets: list[str],
+) -> list[Dependency] | None:
+    """The modules IMPORTED by *targets* (``go list -deps -json``, no tests) —
+    the actually linked set, one version per module.
+
+    - ``replace`` directives (``Module.Replace``): name/version name the BUILT
+      module (a module replacement resolves to the replacement; a local path
+      replace keeps the original, since that is the main module's own code).
+    - A partial result (a package carrying ``Error``/``Incomplete``) is NOT
+      silently treated as complete → ``None`` (fall back to go.sum).
+    - ``None`` = go unusable / error / partial. The own main module (empty
+      version, no replace) drops out.
+    """
+    ok, out = _run_go(["list", "-deps", "-json", *targets], directory)
+    if not ok:
+        return None
+    deps: list[Dependency] = []
+    seen: set[tuple[str, str]] = set()
+    decoder = json.JSONDecoder()
+    i, n = 0, len(out)
+    while i < n:
+        while i < n and out[i] in " \t\r\n":
+            i += 1
+        if i >= n:
+            break
+        try:
+            obj, j = decoder.raw_decode(out, i)
+        except json.JSONDecodeError:
+            break
+        i = j
+        if not isinstance(obj, dict):
+            continue
+        if obj.get("Error") or obj.get("Incomplete"):
+            logger.info("go list -deps: package error in %s — fall back", directory)
+            return None
+        module = obj.get("Module")
+        if not isinstance(module, dict):
+            continue  # stdlib has no module
+        orig_path = module.get("Path", "")
+        orig_version = module.get("Version", "") or ""
+        repl = module.get("Replace")
+        if isinstance(repl, dict):
+            r_path = repl.get("Path", "") or ""
+            r_version = repl.get("Version", "") or ""
+            if r_version:  # module replacement: the built module counts
+                name, version = r_path or orig_path, r_version
+            else:  # local replacement (directory): the main module's own code
+                name, version = orig_path, orig_version
+        else:
+            name, version = orig_path, orig_version
+        if not name or not version:  # own main module / unresolvable
+            continue
+        version = version.lstrip("v")
+        key = (name, version)
+        if key in seen:
+            continue
+        seen.add(key)
+        deps.append(Dependency(
+            name=name, version=version, ecosystem="golang",
+            purl=_make_purl("golang", name, version),
+        ))
+    return deps
+
+
+def resolve_go_linked(directory: Path) -> list[Dependency] | None:
+    """The LINKED Go set for *directory*: ``go list -deps`` from the found
+    ``package main`` (pure library: ``./...``), no tests, replaces resolved.
+    ``None`` when there is no toolchain / go.mod / buildable package / on an
+    error — then the caller falls back to go.sum with a marker.
+    """
+    if not (directory / "go.mod").is_file() or shutil.which("go") is None:
+        return None
+    pkgs = _go_packages(directory)
+    if not pkgs:  # None (go unusable) or no buildable package
+        return None
+    mains = _go_main_packages(pkgs)
+    targets = mains if mains else ["./..."]
+    return _go_deps_modules(directory, targets)
+
+
+def scan_go(path: Path) -> list[Dependency]:
+    """Go dependencies — the LINKED set (``go list -deps``), go.sum only as a
+    fallback. On the fallback every component is marked ``versions_unresolved``
+    so the uploaded payload carries the note and the server records it (CRA).
+    """
+    resolved = resolve_go_linked(path.parent)
+    if resolved is not None:
+        logger.info("go list -deps: %d linked modules in %s", len(resolved), path.parent)
+        return resolved
+    deps = scan_go_sum(path)
+    for dep in deps:
+        dep.versions_unresolved = True
+    logger.info("go.sum fallback: %d modules in %s (versions unresolved)",
+                len(deps), path)
+    return deps
+
+
 def scan_alire_lock(path: Path) -> list[Dependency]:
     """Parse an Ada/SPARK Alire alire.lock (TOML) file."""
     deps: list[Dependency] = []
@@ -1835,7 +2000,7 @@ _SCANNERS: dict[str, tuple[str, type[object] | None]] = {
     "pnpm-lock.yaml": ("pnpm_lock_yaml", None),
     "gradle.lockfile": ("gradle_lockfile", None),
     "pom.xml": ("pom_xml", None),
-    "go.sum": ("go_sum", None),
+    "go.sum": ("go", None),
     "alire.lock": ("alire_lock", None),
     # NuGet / .NET (order nuget-scanner, nachgezogen aus der Suite 0.15.66):
     # the lockfile is the resolved truth, packages.config the classic
@@ -1865,7 +2030,7 @@ _SCANNER_FUNCS = {
     "pnpm_lock_yaml": scan_pnpm_lock_yaml,
     "gradle_lockfile": scan_gradle_lockfile,
     "pom_xml": scan_pom_xml,
-    "go_sum": scan_go_sum,
+    "go": scan_go,
     "packages_lock_json": scan_packages_lock_json,
     "packages_config": scan_packages_config,
     "msbuild_project": scan_msbuild_project,

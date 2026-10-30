@@ -198,12 +198,17 @@ def collect_components(
             condition=condition, scope="optional",
         ))
 
+    go_versions_unresolved = False
     for dep in scan_directory_recursive(
         path, max_depth=max_depth, target_envs=target_envs,
     ):
         # Control-char hygiene FIRST (Befund 15 — a scanner once read colored
         # tool output), so the dedup key and the uploaded payload are clean.
         clean_dependency(dep)
+        # Go went to go.sum (all versions) instead of the linked set — carry
+        # the note into the payload so the server records it (CRA).
+        if getattr(dep, "versions_unresolved", False):
+            go_versions_unresolved = True
         if not dep.declared and _not_component(dep.name):
             continue  # ${ARGN} or the project depending on itself (Befund 47)
         # A find_package behind an off-by-default option is an ALTERNATIVE —
@@ -438,5 +443,6 @@ def collect_components(
         build_output_sources=build_output_sources,
         conditional=len(conditional_comps),
         lifecycle=lifecycle,
+        go_versions_unresolved=go_versions_unresolved,
     )
     return components, stats

@@ -82,6 +82,12 @@ class CheckStats(BaseModel):
     #: build (CMakeCache.txt) or resolved output (lockfile/build output) was
     #: read, "design" when only declarations were, "" when nothing was found.
     lifecycle: str = ""
+    #: True when a Go dependency set came from go.sum (ALL versions, incl.
+    #: superseded) instead of the linked set (``go list -deps``) — no Go
+    #: toolchain / no buildable package on the customer's machine. The server
+    #: records the note so a go.sum-only bill is not read as the built set
+    #: (CRA, Ivan 30.10.2026).
+    go_versions_unresolved: bool = False
 
 
 class CheckPayload(BaseModel):
