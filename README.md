@@ -105,7 +105,7 @@ CLIs for higher-fidelity results.
 
 **Nothing leaves your machine.** The default run transmits nothing.
 
-> **Note on `--send` in 0.18.0 and earlier:** the free CRA readiness report
+> **Note on `--send`:** the free CRA readiness report
 > this option was made for is no longer offered. Please do not use `--send`.
 > Use the local `sbom.cdx.json`.
 
