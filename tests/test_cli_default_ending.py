@@ -45,10 +45,9 @@ class TestNoQuestion:
         assert "is yours" not in res.output
         assert "Wrote sbom.cdx.json (1 component)." in res.output
         assert "Nothing was transmitted." in res.output
-        # one line, even with a long project path (CI tmp paths are long)
-        report_lines = [ln for ln in res.output.splitlines() if "Free CRA readiness report" in ln]
-        assert len(report_lines) == 1, res.output
-        assert report_lines[0].endswith(f"jochwacht-sbom {proj} --send --email you@example.com")
+        # 0.18.1: the free report is no longer offered, so no line advertises it
+        assert "free" not in res.output.lower(), res.output
+        assert "--send" not in res.output, res.output
         assert "privacy" not in res.output.lower()      # the link belongs to --send
 
     def test_without_a_tty_the_same_text(self, tmp_path: Path) -> None:

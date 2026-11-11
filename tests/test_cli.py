@@ -93,8 +93,9 @@ def test_code_uploads_without_email(
     assert result.exit_code == 0, result.stderr
     assert captured["voucher"] == "CHK-ACME-7F3A"
     assert captured["email"] == ""
-    # Rich may wrap the line — assert on a fragment that stays contiguous.
-    assert "registered address" in result.stderr
+    # 0.18.1: the reference only — no promise where or when a report arrives.
+    assert "CHK-TEST-2" in result.stderr
+    assert "registered address" not in result.stderr
 
 
 def test_code_and_voucher_together_rejected(demo_project: Path) -> None:

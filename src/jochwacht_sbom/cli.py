@@ -2,7 +2,7 @@
 
 Usage:
     jochwacht-sbom .                          # read the build, write your SBOM — sends NOTHING
-    jochwacht-sbom . --send --email you@example.com   # free CRA report (asks first)
+    jochwacht-sbom . --send --email you@example.com   # deprecated, see --help
     jochwacht-sbom . --sbom bill.json         # write the SBOM somewhere else
     jochwacht-sbom . --dry-run                # show exactly what a send would contain
     jochwacht-sbom . --output payload.json    # offline / firewall fallback
@@ -48,10 +48,8 @@ _stdout = Console(soft_wrap=True)
 @click.option(
     "--send",
     is_flag=True,
-    help="Send the bill of materials to Jochwacht for a free CRA readiness "
-    "report (needs --email; asks for confirmation first, shows exactly what "
-    "leaves the house). Without this flag NOTHING is transmitted. "
-    "Privacy: https://jochwacht.dev/check-privacy",
+    help="Deprecated: the free report is no longer offered. "
+    "Without this flag NOTHING is transmitted.",
 )
 @click.option(
     "--no-send",
@@ -177,9 +175,7 @@ def main(  # noqa: PLR0913 — CLI surface, mirrors documented flags
     output — and writes a CycloneDX SBOM next to you. The default run
     TRANSMITS NOTHING.
 
-    To get a free CRA readiness report, send the bill explicitly with --send
-    (you are shown exactly what would leave the house and asked first).
-    Never code, never file paths. Privacy: https://jochwacht.dev/check-privacy
+    --send is deprecated: the free report is no longer offered.
     """
     try:
         _run(
@@ -276,11 +272,6 @@ def _print_default_ending(
     # long tmp path wrapped the --send line).
     console.print(f"Wrote {written.name} ({n_components} {noun}){note}.", soft_wrap=True)
     console.print("Nothing was transmitted.", soft_wrap=True)
-    console.print(
-        f"Free CRA readiness report: jochwacht-sbom {path_arg} --send "
-        f"--email you@example.com",
-        soft_wrap=True,
-    )
 
 
 def _print_leaving_summary(payload: CheckPayload) -> None:
@@ -592,8 +583,7 @@ def _run(  # noqa: PLR0913 — mirrors the CLI surface
     if output is not None:
         output.write_bytes(serialize_payload(payload))
         console.print(
-            f"[green]Payload written to {output}.[/green] "
-            "Send it to check@innomatica.de to receive your report."
+            f"[green]Payload written to {output}.[/green]"
         )
         return
 
@@ -630,10 +620,8 @@ def _run(  # noqa: PLR0913 — mirrors the CLI surface
             _print_default_ending(written, len(components), path_arg, updated=updated)
             return
     reference = upload_payload(payload, url=url)
-    destination = contact_email or "your registered address"
     console.print(
-        f"[green]Sent.[/green] Reference: [bold]{reference}[/bold] — "
-        f"your CRA readiness report will be sent to {destination} within 24 hours."
+        f"[green]Sent.[/green] Reference: [bold]{reference}[/bold]."
     )
 
 
