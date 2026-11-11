@@ -53,10 +53,8 @@ environment variables all use the current name.
 **Reads your build, writes your bill of materials — locally.** One command in
 your project folder produces a CycloneDX SBOM, including from **configured
 builds** (`CMakeCache.txt`) and **Yocto/Buildroot build output** that generic
-scanners cannot read. Send it explicitly if you want the free CRA readiness
-report — traffic-light status against the
-[EU Cyber Resilience Act](https://jochwacht.dev/en/cra-nis2-guide.html), your
-component inventory, known vulnerabilities with severity.
+scanners cannot read. The bill is the component inventory the
+[EU Cyber Resilience Act](https://jochwacht.dev/en/cra-nis2-guide.html) asks for.
 
 ## SBOM generation for embedded builds
 
@@ -70,17 +68,14 @@ Buildroot, Zephyr modules, vcpkg manifests. That is what jochwacht-sbom reads.
   1.6 by default, `--cyclonedx 1.7` for the current specification —
   including the C/C++ worlds that have no package manager. Versions of system
   libraries come from the linked system (pkg-config), never guessed.
-- **License and supplier** filled in on the free report for the components we can
-  determine them for, from a curated knowledge base — 50,000+ entries spanning both
-  worlds, from npm and Cargo to Yocto, Buildroot and CMake. The local file carries
-  what your build says; the knowledge base is applied server-side.
+- **License and supplier** as your build and your `jochwacht-deps.yaml` state them.
+  Jochwacht subscribers get them completed from a curated knowledge base on the
+  server.
 - Test material, examples and build tools **marked as excluded** instead of counted
   as product components. Conditional dependencies are marked **optional** instead
   of being guessed into the product.
 - **Nothing leaves your machine by default.** The standard run writes `sbom.cdx.json`
-  next to your project and transmits nothing. Sending it to Jochwacht for a free CRA
-  readiness report is a separate, explicit step — the tool shows you the full list
-  and asks before anything is transmitted.
+  next to your project and transmits nothing.
 
 **Why not a generic scanner?** Measured on 2026-09-09 against syft 1.51.1 across six
 embedded projects (CMake, Zephyr, Yocto, Buildroot): the generic scanner produced
@@ -104,37 +99,25 @@ jochwacht-sbom .                     # reads your build, writes sbom.cdx.json
 You now have your own CycloneDX SBOM. An existing `sbom.cdx.json` is never
 silently overwritten.
 
-**Free CRA readiness report** (optional): send the bill explicitly —
-
-```bash
-jochwacht-sbom . --send --email you@example.com
-```
-
-You are shown exactly what would leave the house (names and versions, no
-paths, no code) and asked to confirm; `--yes` skips the question in scripts.
-No code is required. The report arrives within 24 hours. You can also simply
-e-mail your `sbom.cdx.json` to check@innomatica.de.
-
 More options: `jochwacht-sbom --help` — including `--sbom PATH` (write the
-SBOM elsewhere), `--output payload.json` for air-gapped environments (send the
-file by mail) and `--with-tools` to additionally use native package-manager
+SBOM elsewhere) and `--with-tools` to additionally use native package-manager
 CLIs for higher-fidelity results.
 
-**Nothing leaves your machine unless you say so.** The default run transmits
-nothing; `--send` shows the exact list first and asks. What a send contains —
-and what it never does — is spelled out [further down](#what-a-send-contains--and-what-it-never-does).
+**Nothing leaves your machine.** The default run transmits nothing.
 
-## What a send contains — and what it never does
+> **Note on `--send` in 0.18.0 and earlier:** the free CRA readiness report
+> this option was made for is no longer offered. Please do not use `--send`.
+> Use the local `sbom.cdx.json`.
 
-**If** you send (`--send`), this travels (JSON, ~a few kB):
+## What it reads
 
-- names, versions and package ecosystems of your dependencies
-  (from lockfiles and build files: Conan, vcpkg, CMake, Cargo, npm/yarn/pnpm,
-  Python incl. uv, Go, Maven/Gradle, Meson, Alire, .NET/NuGet — `packages.lock.json`,
-  `<PackageReference>` in project files, `packages.config` — and more),
+- dependencies from lockfiles and build files: Conan, vcpkg, CMake, Cargo,
+  npm/yarn/pnpm, Python incl. uv, Go, Maven/Gradle, Meson, Alire, .NET/NuGet
+  (`packages.lock.json`, `<PackageReference>` in project files,
+  `packages.config`) and more,
 - **Zephyr workspaces**: the `west.yml` module manifest — every module
   with its pinned revision,
-- **Yocto and Buildroot BUILD OUTPUT**: run the check in your build
+- **Yocto and Buildroot BUILD OUTPUT**: run the tool in your build
   directory — it reads `deploy/images/**/*.manifest` (what is actually
   in your image) resp. `legal-info/manifest.csv`. The recipe source
   tree only says what *could* be built, so the build output is what
@@ -142,24 +125,8 @@ and what it never does — is spelled out [further down](#what-a-send-contains--
 - names and versions of FPGA IP cores
   (AMD/Xilinx Vivado `.hwh`/`.xci`, Microchip Libero Tcl/`.cxf`,
   Intel/Altera Quartus `*_hw.tcl`),
-- the project folder name (hash it with `--anonymize`),
-- scan statistics (number of build files, tool version),
-- **only if you wrote them yourself** in `jochwacht-deps.yaml`: the
-  supplier, license, purl and CPE entries of your declaration — a
-  declaration is written for SBOM purposes, so it travels by default and
-  makes your report complete (58 instead of 17 attributed licenses on a
-  typical Zephyr project). Withhold it with `--no-declared-metadata`.
-  Discovered components never carry these fields.
-
-**Never transmitted:** source code, file paths, file contents, configuration,
-credentials. The supplier of a *detected* FPGA IP core is known locally but
-deliberately **not** transmitted — a supplier you declare yourself in
-`jochwacht-deps.yaml` is your statement and does travel.
-See for yourself before sending anything:
-
-```bash
-jochwacht-sbom . --dry-run      # prints the exact payload, uploads nothing
-```
+- your own declarations in `jochwacht-deps.yaml` (supplier, license, purl,
+  CPE).
 
 Build outputs (`dist/`, `build/`, `node_modules/`, …) and hidden
 directories are never scanned. Project-specific excludes go into a
@@ -173,10 +140,10 @@ system libraries (`Doxygen`, `-lanl`, `find_package(Git)`, …) are
 dropped via a curated 950-name skip list — your own `jochwacht-deps.yaml`
 declarations are never skipped; `*` and guessed versions are never
 reported — a missing version is shown as honestly missing. If no
-supported build system is found, nothing is uploaded and the tool tells
+supported build system is found, no SBOM is written and the tool tells
 you exactly what it looks for and where.
 
-This collector is open source so that you can verify exactly what leaves
+This collector is open source so that you can verify that nothing leaves
 your machine.
 
 ## When the tool fails: the diagnosis file
@@ -218,13 +185,13 @@ plain traceback set `JOCHWACHT_SBOM_TRACEBACK=1` (the pre-rename
 | Code | Meaning |
 |------|---------|
 | 0    | success |
-| 1    | error (network, missing --email with --send, a crashed reader — the bill is incomplete, diagnosis file written, …) |
+| 1    | error (network, a crashed reader — the bill is incomplete, diagnosis file written, …) |
 | 2    | no supported build system found — declare dependencies manually in `jochwacht-deps.yaml`; markers of unread build systems are named |
 
 ## Privacy
 
-Data is processed exclusively on Innomatica's own servers in Germany and is
-never shared or sold. Full notes: <https://jochwacht.dev/check-privacy>.
+The tool works locally and transmits nothing. Innomatica's privacy policy:
+<https://jochwacht.dev/en/privacy.html>.
 
 ## About
 
