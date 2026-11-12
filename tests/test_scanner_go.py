@@ -1,6 +1,6 @@
 """Go scanner tests: the LINKED set (go list -deps), go.sum only a fallback.
 
-Ported from the suite (CRA, Ivan 30.10.2026): a go.sum-only bill lists ALL
+Ported from the suite: a go.sum-only bill lists ALL
 versions including superseded ones, so it is marked ``versions_unresolved`` and
 the collector carries that into the payload for the server's note.
 """

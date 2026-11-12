@@ -6,12 +6,14 @@ Extracts dependency coordinates (groupId:artifactId) from pom.xml files.
 from __future__ import annotations
 
 import re
-import xml.etree.ElementTree as ET
+
+from jochwacht_sbom.core import xmlsafe
+from jochwacht_sbom.core.xmlsafe import Element, ParseError
 
 _MAVEN_NS = "{http://maven.apache.org/POM/4.0.0}"
 
 
-def _get_own_group_id(root: ET.Element, ns: str) -> str:
+def _get_own_group_id(root: Element, ns: str) -> str:
     """Return the project's own groupId (or parent groupId as fallback)."""
     group_el = root.find(f"{ns}groupId")
     if group_el is not None and group_el.text:
@@ -33,8 +35,8 @@ def parse(content: str) -> list[str]:
     deps: set[str] = set()
 
     try:
-        root = ET.fromstring(content)  # noqa: S314
-    except ET.ParseError:
+        root = xmlsafe.fromstring(content, what="pom.xml")   # no DOCTYPE, no entities
+    except ParseError:
         # Fall back to regex
         return _parse_regex(content)
 

@@ -1,6 +1,6 @@
 [project]
 name = "jochwacht-sbom"
-version = "0.18.1"
+version = "0.19.0"
 description = "SBOM generation for embedded builds — CMake, Meson, Autotools, Yocto, Buildroot, Zephyr, vcpkg — one command writes a CycloneDX bill of materials from your build; sends nothing unless you say so."
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -45,7 +45,7 @@ Source = "https://github.com/Innomatica-GmbH/jochwacht-sbom"
 Privacy = "https://jochwacht.dev/check-privacy"
 
 [project.scripts]
-jochwacht-sbom = "jochwacht_sbom.cli:main"
+jochwacht-sbom = "jochwacht_sbom.cli:entry"
 
 [build-system]
 requires = ["hatchling"]

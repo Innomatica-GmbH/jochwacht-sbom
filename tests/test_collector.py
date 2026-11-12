@@ -61,7 +61,7 @@ def test_missing_directory_raises(tmp_path: Path) -> None:
 
 
 def test_build_output_yocto_manifest(tmp_path: Path) -> None:
-    """Order collector-embedded-buildsysteme: the collector reads the
+    """the collector reads the
     BUILD OUTPUT — deploy/images manifests (name arch version)."""
     d = tmp_path / "deploy" / "images" / "beaglebone"
     d.mkdir(parents=True)

@@ -244,15 +244,15 @@ def test_a_package_reached_only_by_a_false_edge_is_not_shipped(tmp_path: Path) -
 
 
 def test_development_material_never_enters_the_difference(tmp_path: Path) -> None:
-    """This reader has no dev-scope closure — the two traversals make that safe.
-
-    Development material is unreachable in BOTH traversals, so it cannot
-    appear in the difference and can never be called a marker exclusion.
+    """Development material is unreachable in BOTH traversals, so it cannot
+    appear in the difference and is never called a marker exclusion. Since
+    block 5 (11.11.2026) the dev closure marks it excluded, like the suite —
+    without a marker reason.
     """
     lock = _ws(tmp_path, '{ name = "click" }', _pkg("click") + _pkg("mypy", "1.11.0"))
     envs, _ = parse_target_spec("python=3.10;platform=linux;arch=x86_64")
     mypy = next(d for d in scan_uv_lock(lock, target_envs=envs) if d.name == "mypy")
-    assert mypy.scope != "excluded"
+    assert mypy.scope == "excluded"
     assert mypy.scope_reason == ""
 
 

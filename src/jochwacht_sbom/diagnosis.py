@@ -1,6 +1,6 @@
 """Local diagnosis file for a failed run — nothing leaves the machine.
 
-Order idee-fehlerrueckmeldung-sammler (Ivan, 15.09.2026): when the tool
+when the tool
 fails, it writes ONE local file, names the path and asks in one sentence
 for a mail to support@innomatica.de. No network, no question at the end
 of the run, no automatic sending. The user opens the file first.

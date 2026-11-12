@@ -13,7 +13,6 @@ import pytest
 from click.testing import CliRunner
 
 from jochwacht_sbom import cli as check_cli
-from jochwacht_sbom.core.exceptions import CheckUploadError
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -45,68 +44,57 @@ def test_output_writes_valid_payload_file(demo_project: Path, tmp_path: Path) ->
     assert parsed["components"][0]["name"] == "requests"
 
 
-def test_upload_happy_path_uses_reference(
+_KEY = "jw_test_" + "k" * 24  # a stand-in, never a real key
+
+
+def _answer() -> dict[str, object]:
+    return {"status": "new", "product": "prd_1", "version": 5, "components": 1,
+            "status_href": "/api/v1/products/prd_1/sbom-versions/5/status"}
+
+
+def test_send_happy_path_names_the_version(
     demo_project: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(check_cli, "upload_payload", lambda payload, *, url: "CHK-TEST-1")
-    runner = CliRunner()
-    result = runner.invoke(
-        check_cli.main,
-        # 0.8.4: sending is explicit (--send); --yes skips the confirmation.
-        [str(demo_project), "--send", "--yes",
-         "--voucher", "TEST-1", "--email", "cto@example.com"],
-    )
+    """12.11.2026: --send sends the SBOM to the subscription (key from the
+    environment); the answer names the version."""
+    from jochwacht_sbom import api
+
+    monkeypatch.setattr(api.Client, "upload", lambda self, sbom, *, product: _answer())
+    monkeypatch.setenv("JOCHWACHT_API_KEY", _KEY)
+    result = CliRunner().invoke(check_cli.main, [str(demo_project), "--send", "--yes"])
     assert result.exit_code == 0, result.stderr
-    assert "CHK-TEST-1" in result.stderr
+    assert "version 5" in result.stderr
+    assert _KEY not in result.stderr
 
 
-def test_default_transmits_nothing_and_send_needs_email(demo_project: Path) -> None:
-    """0.8.4 (Ivan 09.09.): the default run writes the SBOM and sends NOTHING —
-    no code is required any more. Only --send transmits, and it needs an
-    address so the report can arrive."""
+def test_default_transmits_nothing_and_send_needs_the_key(
+    demo_project: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The default run writes the SBOM and sends NOTHING. --send needs the
+    key of the subscription in JOCHWACHT_API_KEY."""
     runner = CliRunner()
     result = runner.invoke(check_cli.main, [str(demo_project)])
     assert result.exit_code == 0
     assert "Nothing was transmitted" in result.stderr
 
+    monkeypatch.delenv("JOCHWACHT_API_KEY", raising=False)
     result = runner.invoke(check_cli.main, [str(demo_project), "--send"])
     assert result.exit_code == 1
-    assert "--email" in result.stderr
+    assert "JOCHWACHT_API_KEY" in result.stderr
 
 
-def test_code_uploads_without_email(
+def test_code_and_voucher_end_with_a_message(
     demo_project: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    captured: dict[str, str] = {}
-
-    def fake_upload(payload, *, url):  # type: ignore[no-untyped-def]
-        captured["voucher"] = payload.voucher
-        captured["email"] = payload.contact_email
-        return "CHK-TEST-2"
-
-    monkeypatch.setattr(check_cli, "upload_payload", fake_upload)
-    runner = CliRunner()
-    result = runner.invoke(
+    """The free report is gone: --code, --voucher and --email with --send end
+    with a clear message instead of a send."""
+    monkeypatch.setenv("JOCHWACHT_API_KEY", _KEY)
+    result = CliRunner().invoke(
         check_cli.main,
-        [str(demo_project), "--send", "--yes", "--code", "CHK-ACME-7F3A"],
-    )
-    assert result.exit_code == 0, result.stderr
-    assert captured["voucher"] == "CHK-ACME-7F3A"
-    assert captured["email"] == ""
-    # 0.18.1: the reference only — no promise where or when a report arrives.
-    assert "CHK-TEST-2" in result.stderr
-    assert "registered address" not in result.stderr
-
-
-def test_code_and_voucher_together_rejected(demo_project: Path) -> None:
-    runner = CliRunner()
-    result = runner.invoke(
-        check_cli.main,
-        [str(demo_project), "--send", "--yes",
-         "--code", "CHK-A-1111", "--voucher", "X", "--email", "a@b.de"],
+        [str(demo_project), "--send", "--yes", "--code", "CHK-A-1111", "--voucher", "X"],
     )
     assert result.exit_code == 1
-    assert "not both" in result.stderr
+    assert "no longer offered" in " ".join(result.stderr.split())
 
 
 def test_empty_project_exits_2(tmp_path: Path) -> None:
@@ -120,16 +108,14 @@ def test_empty_project_exits_2(tmp_path: Path) -> None:
 def test_upload_error_maps_to_exit_1(
     demo_project: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    def _boom(payload: object, *, url: str) -> str:
-        raise CheckUploadError("endpoint down")
+    from jochwacht_sbom import api
 
-    monkeypatch.setattr(check_cli, "upload_payload", _boom)
-    runner = CliRunner()
-    result = runner.invoke(
-        check_cli.main,
-        [str(demo_project), "--send", "--yes",
-         "--voucher", "TEST-1", "--email", "cto@example.com"],
-    )
+    def _boom(self: object, sbom: bytes, *, product: str) -> dict[str, object]:
+        raise api.ApiError("endpoint down")
+
+    monkeypatch.setattr(api.Client, "upload", _boom)
+    monkeypatch.setenv("JOCHWACHT_API_KEY", _KEY)
+    result = CliRunner().invoke(check_cli.main, [str(demo_project), "--send", "--yes"])
     assert result.exit_code == 1
     assert "endpoint down" in result.stderr
 

@@ -1,4 +1,4 @@
-"""Branch-, option- and cache-aware CMake ``find_package`` analysis (Befund 38).
+"""Branch-, option- and cache-aware CMake ``find_package`` analysis.
 
 A ``find_package()`` is not automatically a component of the product. In a
 C/C++ project with selectable backends the call sits inside an ``if`` branch
@@ -41,6 +41,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from jochwacht_sbom.core.file_limit import MAX_BUILD_FILE, note_skipped, too_large
 from jochwacht_sbom.core.log import get_logger
 
 logger = get_logger(__name__)
@@ -96,11 +97,11 @@ class CMakeContext:
     #: Find modules in the project tree that only locate a PROGRAM
     #: (find_program, no find_library/find_path/pkg_check): their
     #: find_package() names are tooling, never product components
-    #: (Befund 57: lws' FindOpenSSLbins.cmake finds the openssl BINARY).
+    #: (lws' FindOpenSSLbins.cmake finds the openssl BINARY).
     program_modules: set[str] = field(default_factory=set)
     #: resolved child dir → (resolved parent dir, guard atoms) — a subdirectory
     #: added under ``if(LWS_WITH_MBEDTLS) add_subdirectory(mbedtls)`` inherits
-    #: that guard, and so does every find_library inside it (Befund 46).
+    #: that guard, and so does every find_library inside it.
     added_by: dict[str, tuple[str, list[tuple[bool, str]]]] = field(
         default_factory=dict,
     )
@@ -150,7 +151,7 @@ def version_from_cache(name: str, ctx: CMakeContext) -> str:
     """Best resolved version for a configured ``find_package(NAME)`` package.
 
     The configured build already found the library; its version is a fact of
-    the build machine recorded in the cache (Befund 41). Sources, in order of
+    the build machine recorded in the cache. Sources, in order of
     trust: an explicit ``<NAME>_VERSION`` variable, the pkg-config
     ``_<NAME>_VERSION``, CMake's own ``FIND_PACKAGE_MESSAGE_DETAILS_<Name>``
     record, and last the resolved library path (``libcrypto.so.3.0.2``).
@@ -507,7 +508,7 @@ def _walk_dependencies(
     (``scan_cmake`` emits only those); the full set (find_library, find_path,
     pkg_check_modules, …) drives :func:`find_dependencies` for the pipeline
     filter, so an option-guarded find_library (mbedtls, alsa) is resolved the
-    same way a find_package is (Befund 46). *inherited* prepends the guard a
+    same way a find_package is. *inherited* prepends the guard a
     directory carries from the ``add_subdirectory`` chain.
     """
     base = list(inherited or [])
@@ -596,6 +597,10 @@ def _parse_options(content: str, into: dict[str, bool]) -> None:
 
 
 def _load_cache(path: Path, into: dict[str, str]) -> None:
+    if too_large(path):
+        # a 65 MiB CMakeCache.txt was read whole
+        note_skipped(path)
+        return
     try:
         text = path.read_text(encoding="utf-8", errors="replace")
     except OSError:
@@ -615,6 +620,12 @@ _SKIP_DIRS: frozenset[str] = frozenset({
 def _is_find_module(path: Path) -> bool:
     """A ``Find<Name>.cmake`` file is a search module, not a declaration."""
     return bool(re.fullmatch(r"Find.+\.cmake", path.name))
+
+
+#: Largest CMake file the context walk reads — the one limit
+#: (core.file_limit; a 65 MiB CMakeLists.txt was skipped by the
+#: walk and read whole here, 13.6 s and 167 MiB). A larger one gives no options.
+MAX_CMAKE_FILE = MAX_BUILD_FILE
 
 
 def build_cmake_context(
@@ -652,6 +663,9 @@ def build_cmake_context(
                 _walk(entry, depth + 1)
             elif name == "CMakeLists.txt" or name.endswith(".cmake"):
                 try:
+                    if entry.stat().st_size > MAX_CMAKE_FILE or too_large(entry):
+                        note_skipped(entry)
+                        continue
                     text = entry.read_text(encoding="utf-8", errors="replace")
                 except OSError:
                     continue
@@ -670,7 +684,7 @@ def build_cmake_context(
                     continue
                 _parse_options(text, ctx.options)
                 # add_subdirectory(X) under a guard makes X (and its find_library
-                # calls) inherit that guard (Befund 46).
+                # calls) inherit that guard.
                 parent = str(entry.parent.resolve())
                 for child, atom_tuples in _collect_add_subdirs(text, entry.parent):
                     if atom_tuples:  # only record guarded subdirectories

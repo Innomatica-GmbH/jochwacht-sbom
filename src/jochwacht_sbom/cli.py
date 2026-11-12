@@ -2,40 +2,44 @@
 
 Usage:
     jochwacht-sbom .                          # read the build, write your SBOM — sends NOTHING
-    jochwacht-sbom . --send --email you@example.com   # deprecated, see --help
+    jochwacht-sbom . --send                   # …and send it to your subscription
+                                              #   (key in JOCHWACHT_API_KEY)
+    jochwacht-sbom status [--wait 600]        # the light of the version you sent
     jochwacht-sbom . --sbom bill.json         # write the SBOM somewhere else
     jochwacht-sbom . --dry-run                # show exactly what a send would contain
     jochwacht-sbom . --output payload.json    # offline / firewall fallback
 
 Exit codes: 0 = success, 1 = error (including a defect in a reader — the
 bill is incomplete, a local diagnosis file is written), 2 = no supported
-build system found.
+build system found. ``status``: 0 = green, yellow or waiting for a person,
+1 = red, 2 = not checkable, an error, or still running when --wait is over.
 """
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
 import click
-from rich.console import Console
 
-from jochwacht_sbom import __version__, diagnosis, env, filenames
+from jochwacht_sbom import __version__, api, diagnosis, env, filenames
 from jochwacht_sbom.collector import collect_components
 from jochwacht_sbom.core.exceptions import JochwachtError
-from jochwacht_sbom.payload import CheckPayload, build_payload
+from jochwacht_sbom.core.log import SafeConsole, fg
+from jochwacht_sbom.payload import build_payload
 from jochwacht_sbom.sbom_out import (
     SPEC_VERSION,
     SPEC_VERSIONS,
     classify_existing,
     write_cyclonedx,
 )
-from jochwacht_sbom.upload import DEFAULT_SUBMIT_URL, serialize_payload, upload_payload
+from jochwacht_sbom.upload import DEFAULT_SUBMIT_URL, serialize_payload
 
 _PRIVACY_URL = "https://jochwacht.dev/check-privacy"
 
-console = Console(stderr=True)
-_stdout = Console(soft_wrap=True)
+console = SafeConsole(stderr=True)
+_stdout = SafeConsole(soft_wrap=True)
 
 
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
@@ -48,8 +52,19 @@ _stdout = Console(soft_wrap=True)
 @click.option(
     "--send",
     is_flag=True,
-    help="Deprecated: the free report is no longer offered. "
-    "Without this flag NOTHING is transmitted.",
+    help="Send the SBOM written here to your Jochwacht subscription. The key "
+    "comes from JOCHWACHT_API_KEY (never from the command line), the address "
+    "from JOCHWACHT_API_URL (default https://api.jochwacht.dev); https only, "
+    "no redirect is followed. The answer is kept in .jochwacht/last-upload.json "
+    "for `jochwacht-sbom status` — a later CI step must run in the same "
+    "directory, or pass --status-href. Without this flag NOTHING is transmitted.",
+)
+@click.option(
+    "--product",
+    default=lambda: os.environ.get(api.PRODUCT_ENV, ""),
+    show_default="JOCHWACHT_PRODUCT",
+    help="The product the SBOM belongs to (name, reference or id); needed only "
+    "when the subscription has several products.",
 )
 @click.option(
     "--no-send",
@@ -73,14 +88,10 @@ _stdout = Console(soft_wrap=True)
     help="Where to write the CycloneDX SBOM (default: ./sbom.cdx.json). An "
     "existing file is never silently overwritten.",
 )
-@click.option(
-    "--code",
-    default="",
-    help="Personal one-time code from https://jochwacht.dev/check (optional; "
-    "the report goes to the address you registered there).",
-)
-@click.option("--voucher", default="",
-              help="Optional partner / campaign code (tracking only).")
+@click.option("--code", default="", hidden=True,
+              help="Gone with the free report (ends with a message).")
+@click.option("--voucher", default="", hidden=True,
+              help="Gone with the free report (ends with a message).")
 @click.option(
     "--cyclonedx",
     "spec_version",
@@ -96,12 +107,8 @@ _stdout = Console(soft_wrap=True)
     help="Report language. Default: the language of the landing page "
          "your code was issued on (German if undeterminable).",
 )
-@click.option(
-    "--email",
-    "contact_email",
-    default="",
-    help="E-mail address the report is sent to (required with --voucher).",
-)
+@click.option("--email", "contact_email", default="", hidden=True,
+              help="Gone with the free report (ends with a message).")
 @click.option(
     "--dry-run",
     is_flag=True,
@@ -143,15 +150,12 @@ _stdout = Console(soft_wrap=True)
     "Without this nothing is evaluated. Keys: python, platform, arch, "
     "system, os, implementation.",
 )
-@click.option(
-    "--url",
-    default=DEFAULT_SUBMIT_URL,
-    show_default=False,
-    help="Override the submit endpoint (testing).",
-)
+@click.option("--url", default=DEFAULT_SUBMIT_URL, hidden=True,
+              help="Gone with the free report; the address is JOCHWACHT_API_URL.")
 def main(  # noqa: PLR0913 — CLI surface, mirrors documented flags
     path: Path,
     send: bool,
+    product: str,
     never_send: bool,
     assume_yes: bool,
     sbom_path: Path | None,
@@ -175,12 +179,14 @@ def main(  # noqa: PLR0913 — CLI surface, mirrors documented flags
     output — and writes a CycloneDX SBOM next to you. The default run
     TRANSMITS NOTHING.
 
-    --send is deprecated: the free report is no longer offered.
+    --send sends that SBOM to your subscription; `jochwacht-sbom status`
+    then reads the light of its version.
     """
     try:
         _run(
             path=path,
             send=send,
+            product=product,
             never_send=never_send,
             assume_yes=assume_yes,
             sbom_path=sbom_path,
@@ -198,7 +204,7 @@ def main(  # noqa: PLR0913 — CLI surface, mirrors documented flags
             url=url,
         )
     except JochwachtError as exc:
-        console.print(f"[red]Error:[/red] {exc}")
+        console.print(f"[red]Error:[/red] {fg(exc)}")
         sys.exit(exc.exit_code)
     except (click.Abort, click.ClickException, click.exceptions.Exit):
         raise
@@ -231,7 +237,7 @@ def _print_diagnosis_request(where: Path, *, fix: str) -> None:
     """The one sentence the order asks for: where the file is, what it
     does not contain, and the request to mail it — by hand, never by us."""
     console.print(
-        f"Diagnosis written to {where} — no package names, versions or "
+        f"Diagnosis written to {fg(where)} — no package names, versions or "
         f"paths; open it and check.",
         soft_wrap=True,
     )
@@ -252,7 +258,7 @@ def _print_reader_failures(
     )
     noun = "reader" if len(failures) == 1 else "readers"
     console.print(
-        f"[red]{len(failures)} {noun} failed:[/red] {named} — the bill of "
+        f"[red]{len(failures)} {noun} failed:[/red] {fg(named)} — the bill of "
         f"materials is INCOMPLETE. A defect in jochwacht-sbom, not in your "
         f"project.",
         soft_wrap=True,
@@ -263,38 +269,40 @@ def _print_reader_failures(
 def _print_default_ending(
     written: Path, n_components: int, path_arg: str, *, updated: bool,
 ) -> None:
-    """The end of the default run — output text, never a question (Ivan,
-    11.09.2026: "defaultmäßig nicht fragen, sondern als Output-Text")."""
+    """The end of the default run — output text, never a question."""
     noun = "component" if n_components == 1 else "components"
     note = " — previous run replaced" if updated else ""
     # soft_wrap: these lines are copied from CI logs and pipes — a command
     # hard-wrapped at 80 columns is a broken command (measured in CI: the
     # long tmp path wrapped the --send line).
-    console.print(f"Wrote {written.name} ({n_components} {noun}){note}.", soft_wrap=True)
+    console.print(f"Wrote {fg(written.name)} ({n_components} {noun}){note}.", soft_wrap=True)
     console.print("Nothing was transmitted.", soft_wrap=True)
 
 
-def _print_leaving_summary(payload: CheckPayload) -> None:
-    """Exactly what would leave the house: names + versions, no paths."""
-    comps = payload.components
+def _stdin_is_terminal() -> bool:
+    """The question before a send is asked only at a terminal."""
+    return sys.stdin.isatty()
+
+
+def _print_leaving_summary(written: Path, n_components: int, base: str, product: str) -> None:
+    """What leaves the house: the SBOM file exactly as written — the customer
+    can open it and see every field before saying yes."""
+    noun = "component" if n_components == 1 else "components"
+    host = base.split("://", 1)[-1]
     console.print(
-        f"\n[bold]This would be sent[/bold] ({len(comps)} entries — names and "
-        f"versions only, no code, no file paths):"
+        f"\n[bold]This would be sent[/bold] to {fg(host)}: {fg(written.name)} exactly as "
+        f"written ({n_components} {noun}; open the file to see every field).",
+        soft_wrap=True,
     )
-    for c in comps[:15]:
-        console.print(f"  {c.name} {c.version or '(no version)'}")
-    if len(comps) > 15:
-        console.print(f"  … and {len(comps) - 15} more")
-    console.print(
-        f"  [dim]plus: project label '{payload.project_label}', tool version, "
-        f"contact address '{payload.contact_email or '(from your code)'}'[/dim]"
-    )
+    if product:
+        console.print(f"  [dim]product: {fg(product)}[/dim]")
 
 
 def _run(  # noqa: PLR0913 — mirrors the CLI surface
     *,
     path: Path,
     send: bool = False,
+    product: str = "",
     never_send: bool = False,
     assume_yes: bool = False,
     sbom_path: Path | None = None,
@@ -313,10 +321,10 @@ def _run(  # noqa: PLR0913 — mirrors the CLI surface
 ) -> None:
     """Execute collect → write the SBOM → show → (offer to send).
 
-    Order collector-transparent-machen (Ivan, 09.09.2026): the DEFAULT run
+    the DEFAULT run
     generates, shows and SAVES — it transmits nothing. Sending is an explicit
     decision: --send, or answering the question after the summary. A code is
-    no longer required (Ivan, 09.09.): only an e-mail address, so the report
+    no longer required: only an e-mail address, so the report
     can reach the customer; --voucher stays optional for partner tracking.
     """
     # Uploading now happens ONLY on an explicit request. --dry-run and
@@ -327,27 +335,27 @@ def _run(  # noqa: PLR0913 — mirrors the CLI surface
         )
         sys.exit(1)
     uploading = send and not dry_run and output is None
-    if uploading and code and voucher:
-        console.print("[red]Error:[/red] use either --code or --voucher, not both.")
-        sys.exit(1)
-    if uploading and code:
-        # Personal one-time token: the server knows the registered address.
-        voucher = code
-    if uploading and contact_email and "@" not in contact_email:
-        console.print("[red]Error:[/red] --email must be a valid address (report delivery).")
-        sys.exit(1)
-    # --send is a promise to transmit: check its precondition BEFORE scanning,
-    # so the customer is not told "error" only after the work is done. With a
-    # personal --code the server knows the address, so that path needs none.
-    if uploading and not code and "@" not in (contact_email or ""):
-        console.print(
-            "[red]Error:[/red] --send needs --email (the address your report "
-            "is sent to). Example: jochwacht-sbom . --send --email "
-            "you@example.com"
-        )
-        sys.exit(1)
+    if uploading:
+        gone = [flag for flag, value in (("--email", contact_email), ("--voucher", voucher),
+                                         ("--code", code), ("--url", url != DEFAULT_SUBMIT_URL))
+                if value]
+        if gone:
+            console.print(
+                f"[red]Error:[/red] {', '.join(gone)} belonged to the free report, which is no "
+                f"longer offered. --send now sends the SBOM to your Jochwacht subscription: "
+                f"the key comes from {api.KEY_ENV}, the address from {api.URL_ENV}.",
+                soft_wrap=True,
+            )
+            sys.exit(1)
+    # --send is a promise to transmit: check its preconditions BEFORE scanning,
+    # so the customer is not told "error" only after the work is done.
+    api_base = api_key = ""
+    if uploading:
+        api_base = api.api_base(os.environ.get(api.URL_ENV))
+        api_key = api.api_key()
 
-    console.print(f"[bold]jochwacht-sbom[/bold] {__version__} — scanning {path.resolve().name}/")
+    console.print(
+        f"[bold]jochwacht-sbom[/bold] {__version__} — scanning {fg(path.resolve().name)}/")
 
     # Eine Erklaerungsdatei, die anders heisst, wird NICHT gelesen. Sie
     # stillschweigend zu uebergehen waere das Einzige, was dieses Werkzeug
@@ -355,9 +363,9 @@ def _run(  # noqa: PLR0913 — mirrors the CLI surface
     # sagen. Geprueft wird die FORM, nicht ein bestimmter Name.
     for found, needed in filenames.declaration_file_not_read(path):
         console.print(
-            f"[yellow]Note:[/yellow] {found} is present and is [bold]not[/bold] "
-            f"read — this tool only reads {needed}. Rename it "
-            f"([dim]mv {found} {needed}[/dim]) or its contents are left out of "
+            f"[yellow]Note:[/yellow] {fg(found)} is present and is [bold]not[/bold] "
+            f"read — this tool only reads {fg(needed)}. Rename it "
+            f"([dim]mv {fg(found)} {fg(needed)}[/dim]) or its contents are left out of "
             f"the bill."
         )
 
@@ -366,11 +374,11 @@ def _run(  # noqa: PLR0913 — mirrors the CLI surface
 
     target_envs, env_warnings = parse_target_spec(target_env)
     for warnung in env_warnings:
-        console.print(f"[yellow]Note:[/yellow] {warnung}")
+        console.print(f"[yellow]Note:[/yellow] {fg(warnung)}")
     if target_envs:
         console.print(
             f"[dim]Target environments ({len(target_envs)}): "
-            f"{'; '.join(e.label for e in target_envs)}[/dim]"
+            f"{fg('; '.join(e.label for e in target_envs))}[/dim]"
         )
 
     components, stats = collect_components(
@@ -389,7 +397,7 @@ def _run(  # noqa: PLR0913 — mirrors the CLI surface
         # otherwise push the rest of the output off the screen.
         sortiert = sorted(nicht_geliefert, key=lambda x: (x.name, x.version))
         for c in sortiert[:15]:
-            console.print(f"  [dim]{c.name} {c.version}[/dim]")
+            console.print(f"  [dim]{fg(c.name)} {fg(c.version)}[/dim]")
         if len(sortiert) > 15:
             console.print(
                 f"  [dim]… and {len(sortiert) - 15} more (all of them are in "
@@ -414,7 +422,7 @@ def _run(  # noqa: PLR0913 — mirrors the CLI surface
     # "Bausystem nicht unterstützt": markers of build systems we do not read
     # yet, counted by our own labels — a roadmap line, never a defect.
     unread = diagnosis.find_unsupported_markers(path)
-    # Conditional alternatives travel MARKED, not as components (Befund 44).
+    # Conditional alternatives travel MARKED, not as components.
     real = [c for c in components if not c.condition]
     conditional = [c for c in components if c.condition]
 
@@ -445,7 +453,7 @@ def _run(  # noqa: PLR0913 — mirrors the CLI surface
             console.print(
                 "[yellow]No components in the DEFAULT build.[/yellow]\n"
                 f"{len(conditional)} optional backend(s) are available behind "
-                f"a build option ({names}): no default build contains them, "
+                f"a build option ({fg(names)}): no default build contains them, "
                 "and mutually exclusive ones (OpenSSL or LibreSSL) never both "
                 "ship.\n"
                 "Configure the build once (e.g. `cmake -S . -B build "
@@ -478,7 +486,7 @@ def _run(  # noqa: PLR0913 — mirrors the CLI surface
             )
             console.print(
                 f"Build-system markers seen that jochwacht-sbom does not read "
-                f"yet: {diagnosis.format_markers(unread)}.",
+                f"yet: {fg(diagnosis.format_markers(unread))}.",
                 soft_wrap=True,
             )
             _print_diagnosis_request(
@@ -498,21 +506,32 @@ def _run(  # noqa: PLR0913 — mirrors the CLI surface
         f"({', '.join(stats.ecosystems) or 'no ecosystem info'}) "
         f"in {stats.build_files_scanned} build files."
     )
+    if stats.own_project_entries:
+        console.print(
+            "[dim]Not counted as a component, the project itself: "
+            f"{fg(', '.join(stats.own_project_entries))}[/dim]",
+            soft_wrap=True,
+        )
     if conditional:
         names = ", ".join(sorted(c.name for c in conditional)[:4])
         console.print(
             f"[dim]{len(conditional)} conditional alternative(s) behind build "
-            f"options ({names}) — marked, not counted, not gating. Configure "
+            f"options ({fg(names)}) — marked, not counted, not gating. Configure "
             f"the build to resolve which is used.[/dim]"
         )
     for src in stats.build_output_sources:
-        console.print(f"[dim]Build output: {src}[/dim]")
+        console.print(f"[dim]Build output: {fg(src)}[/dim]")
+    if stats.oversized_files:
+        # a skipped file is named in the result, never only a log line
+        console.print(
+            f"[yellow]{len(stats.oversized_files)} file(s) not read, over 64 MiB:[/yellow] "
+            + ", ".join(fg(n) for n in stats.oversized_files), soft_wrap=True)
     if unread:
         # Read build systems next to unread ones (CMake beside Bazel): say
         # what was not read, so an incomplete bill is never mistaken for a
         # complete one. No file — the run itself is fine.
         console.print(
-            f"[dim]Not read (no reader yet): {diagnosis.format_markers(unread)} "
+            f"[dim]Not read (no reader yet): {fg(diagnosis.format_markers(unread))} "
             f"— tell {diagnosis.SUPPORT_ADDRESS} if you need it.[/dim]",
             soft_wrap=True,
         )
@@ -555,7 +574,7 @@ def _run(  # noqa: PLR0913 — mirrors the CLI surface
 
     payload = build_payload(
         lang=lang or "",
-        # No placeholder (Befund 93a): the field was filled with the literal
+        # No placeholder: the field was filled with the literal
         # "DRY-RUN" on EVERY payload — the old comment claimed it was "for
         # dry-run/offline only", but a real --send carried it too. On the
         # server that beat the honest classification, so a paying prospect
@@ -583,7 +602,7 @@ def _run(  # noqa: PLR0913 — mirrors the CLI surface
     if output is not None:
         output.write_bytes(serialize_payload(payload))
         console.print(
-            f"[green]Payload written to {output}.[/green]"
+            f"[green]Payload written to {fg(output)}.[/green]"
         )
         return
 
@@ -612,20 +631,109 @@ def _run(  # noqa: PLR0913 — mirrors the CLI surface
         return
 
     # --- The send path: show what leaves the house, then ask -------------
+    n_sent = len(components)
     if not assume_yes:
-        _print_leaving_summary(payload)
-        console.print(f"[dim]Privacy: {_PRIVACY_URL}[/dim]")
-        if not click.confirm("Send this to Jochwacht?", default=True):
-            console.print("[yellow]Nothing was sent.[/yellow]")
-            _print_default_ending(written, len(components), path_arg, updated=updated)
-            return
-    reference = upload_payload(payload, url=url)
+        _print_leaving_summary(written, n_sent, api_base, product)
+        if _stdin_is_terminal():
+            if not click.confirm("Send this SBOM to Jochwacht?", default=False):
+                console.print("[yellow]Nothing was sent.[/yellow]")
+                _print_default_ending(written, len(components), path_arg, updated=updated)
+                return
+        else:
+            # A pipeline wrote --send into its line on purpose: no question
+            # that hangs or fails there, but a line that says so
+            # --yes stays for a terminal.
+            console.print("sending without confirmation (no terminal)")
+    answer = api.Client(api_base, api_key).upload(written.read_bytes(), product=product)
+    kept = api.save_last_upload(path, api_base, answer)
+    state = answer.get("status", "?")
     console.print(
-        f"[green]Sent.[/green] Reference: [bold]{reference}[/bold]."
+        f"[green]Sent.[/green] {fg(str(state))}: version {fg(str(answer.get('version', '?')))} "
+        f"of {fg(str(answer.get('product', product or '?')))}, "
+        f"{fg(str(answer.get('components', n_sent)))} components.",
+        soft_wrap=True,
     )
+    href = answer.get("status_href")
+    if href:
+        console.print(
+            f"The result: [bold]jochwacht-sbom status[/bold] in this directory "
+            f"(answer kept in {fg(str(kept.relative_to(path)))}), or "
+            f"jochwacht-sbom status --status-href {fg(str(href))}",
+            soft_wrap=True,
+        )
+
+
+@click.command(context_settings={"help_option_names": ["-h", "--help"]})
+@click.option("--wait", type=click.IntRange(min=0), default=600, show_default=True,
+              help="Seconds to wait while the comparison still runs (503) or a budget "
+              "is reached (429), asking again after Retry-After. 0 asks once.")
+@click.option("--preliminary", is_flag=True,
+              help="Ask for the preliminary light, before a person looked (Premium "
+              "of the product; without it the answer is 403, exit 2).")
+@click.option("--status-href", default="",
+              help="The status address from the upload answer, when "
+              ".jochwacht/last-upload.json is not in this directory.")
+@click.option("--product", default=lambda: os.environ.get(api.PRODUCT_ENV, ""),
+              show_default="JOCHWACHT_PRODUCT",
+              help="Without a status address: the product whose current version "
+              "is asked (name, reference or id).")
+@click.option("--project-dir", type=click.Path(file_okay=False, path_type=Path),
+              default=Path("."), show_default=True,
+              help="Where .jochwacht/last-upload.json lies (the directory --send ran in).")
+def status_command(wait: int, preliminary: bool, status_href: str, product: str,
+                   project_dir: Path) -> None:
+    """The light of the version you sent, for a pipeline.
+
+    Exit 0: green, yellow or waiting for a person (the result comes by mail).
+    Exit 1: red. Exit 2: the version could not be checked, an error, or the
+    comparison still runs when --wait is over. The ready line of the answer
+    is always printed. The key comes from JOCHWACHT_API_KEY.
+    """
+    try:
+        href: str | None = status_href or None
+        # The address comes only from JOCHWACHT_API_URL or the default — never
+        # from the saved file: a checked-in .jochwacht/last-upload.json of a
+        # foreign repository would otherwise send the key to its host.
+        base = api.api_base(os.environ.get(api.URL_ENV))
+        if href is None and not product:
+            saved = api.load_last_upload(project_dir)
+            saved_url = str(saved.get("api_url") or "").rstrip("/")
+            if saved_url and saved_url != base:
+                msg = (f"{api.LAST_UPLOAD} names {saved_url}, but the address in use is "
+                       f"{base} ({api.URL_ENV} or the default). Nothing was sent; set "
+                       f"{api.URL_ENV} if that address is yours, or give --status-href.")
+                raise api.ApiError(msg)
+            answer = saved.get("answer")
+            href = (answer.get("status_href") if isinstance(answer, dict) else None) or None
+        client = api.Client(base, api.api_key())
+        result = api.wait_for_status(client, href=href, product=product,
+                                     preliminary=preliminary, wait=wait)
+    except api.ApiError as exc:
+        console.print(f"[red]Error:[/red] {fg(exc)}", soft_wrap=True)
+        sys.exit(2)
+    except Exception as exc:  # noqa: BLE001 — every error is exit 2, never "red"
+        # No traceback and no message: the message of a library error may
+        # carry a header value, the key among them.
+        console.print(
+            f"[red]Error:[/red] jochwacht-sbom status stopped with an internal error "
+            f"({type(exc).__name__}). Nothing about your key is shown.", soft_wrap=True)
+        sys.exit(2)
+    _stdout.print(fg(result.line), soft_wrap=True)
+    sys.exit(result.exit_code)
+
+
+def entry(argv: list[str] | None = None) -> None:
+    """The console script: ``jochwacht-sbom status …`` reads the light, every
+    other call reads the build. A project directory named ``status`` is given
+    as ``./status``."""
+    args = sys.argv[1:] if argv is None else argv
+    if args and args[0] == "status":
+        status_command(args[1:], prog_name="jochwacht-sbom status")
+    else:
+        main(args, prog_name="jochwacht-sbom")
 
 
 if __name__ == "__main__":
-    main()
+    entry()
 
 

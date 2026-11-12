@@ -17,7 +17,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from jochwacht_sbom import filenames as file_names
 from jochwacht_sbom.analyzer.normalize import normalize_dep_name
 from jochwacht_sbom.analyzer.pipeline import run_pipeline
 from jochwacht_sbom.analyzer.scanner import _apply_cmake_conditions, collect_build_files
@@ -55,22 +54,13 @@ _NAME_ONLY_ECOSYSTEMS = frozenset({
 })
 
 
-def _project_name(path: Path) -> str:
-    """Project identity for the self-reference filter (Befund 75): the name in
-    jochwacht.yaml (or the older jochwacht.yaml) if the tree carries one, else
-    the directory name — the same precedence the suite uses, so both tools
-    agree on what "self" is."""
-    cfg = file_names.find(path, file_names.CONFIG)
-    if cfg is not None:
-        try:
-            import yaml
-            data = yaml.safe_load(cfg.read_text(encoding="utf-8")) or {}
-            name = (data.get("project") or {}).get("name")
-            if isinstance(name, str) and name.strip():
-                return name.strip()
-        except (OSError, ValueError, yaml.YAMLError):
-            pass
-    return path.resolve().name
+def _own_identities(path: Path) -> frozenset[tuple[str, str]]:
+    """``(name, ecosystem)`` the project declares for itself — the self
+    filter compares exactly, within that ecosystem, never against the folder
+    name and never fuzzily (sbom/project_identity.py, as in the suite)."""
+    from jochwacht_sbom.sbom.project_identity import declared_project_identities
+
+    return declared_project_identities(path)
 
 
 def _is_parser_noise(name: str, version: str, ecosystem: str) -> bool:
@@ -138,27 +128,32 @@ def collect_components(
     if not path.is_dir():
         msg = f"Not a directory: {path}"
         raise CheckCollectionError(msg)
+    from jochwacht_sbom.core import file_limit
+
+    file_limit.reset_skipped()           # this run's oversized files, each once
 
     # Path 1: lockfiles / manifests — these win on conflict (they carry
     # pinned versions), so they are inserted first. Manifest-constraint
     # floors already lost against resolved versions inside
     # scan_directory_recursive (prefer_locked); the survivors are labelled
     # honestly — a ">=" floor is not a lockfile fact.
-    from jochwacht_sbom.sbom.skiplist import is_skipped
-
     # Identity of a component is (name, version, ecosystem) — never the
     # name alone: npm regularly nests two versions of one package, and
     # the older nested one is often the vulnerable one (order
     # collector-mehrfachversionen).
     # The project's own name (its directory) is not a third-party component;
-    # neither is an unexpanded CMake variable (Befund 47).
-    # Self-reference identity from the same source as the suite (Befund 75):
+    # neither is an unexpanded CMake variable.
+    # Self-reference identity from the same source as the suite:
     # the project name in jochwacht.yaml when present, else the directory name.
     # (The suite filters self-refs by its --project/config name; a measurement
     # in a differently-named copy dir must not diverge.)
-    proj = normalize_dep_name(_project_name(path))
+    from jochwacht_sbom.sbom.project_identity import is_own
+    from jochwacht_sbom.sbom.skiplist import is_skipped
 
-    # One CMake context for both paths (Befund 75): tool + program-module
+    own = _own_identities(path)
+    own_dropped: set[str] = set()
+
+    # One CMake context for both paths: tool + program-module
     # classification must match scan_cmake / the suite reconciler exactly.
     from jochwacht_sbom.sbom.classify import is_build_tool
     from jochwacht_sbom.sbom.cmake_conditions import build_cmake_context
@@ -168,13 +163,16 @@ def collect_components(
     def _is_tooling(name: str) -> bool:
         return is_build_tool(name) or name in cmake_ctx.program_modules
 
-    def _not_component(name: str) -> bool:
-        return is_invalid_name(name) or (
-            bool(proj) and normalize_dep_name(name) == proj
-        )
+    def _not_component(name: str, ecosystem: str) -> bool:
+        if is_invalid_name(name):
+            return True
+        if is_own(name, ecosystem or "", own):
+            own_dropped.add(name)       # named in the output, never silent
+            return True
+        return False
 
     merged: dict[tuple[str, str], CheckComponent] = {}
-    # Conditional ALTERNATIVES travel MARKED, not dropped (Befund 44): the
+    # Conditional ALTERNATIVES travel MARKED, not dropped: the
     # report can then say "your project can be built with OpenSSL or LibreSSL
     # — configure once". They are never counted as components, never gating.
     conditional_comps: list[CheckComponent] = []
@@ -199,8 +197,13 @@ def collect_components(
         ))
 
     go_versions_unresolved = False
+    # Files the lockfile/manifest path read (west.yml, uv.lock, …): they
+    # count as build files too — a read west.yml is a build system found,
+    # even when no component of it survives the filters.
+    manifest_files: list[Path] = []
     for dep in scan_directory_recursive(
         path, max_depth=max_depth, target_envs=target_envs,
+        read_files=manifest_files,
     ):
         # Control-char hygiene FIRST (Befund 15 — a scanner once read colored
         # tool output), so the dedup key and the uploaded payload are clean.
@@ -209,8 +212,8 @@ def collect_components(
         # the note into the payload so the server records it (CRA).
         if getattr(dep, "versions_unresolved", False):
             go_versions_unresolved = True
-        if not dep.declared and _not_component(dep.name):
-            continue  # ${ARGN} or the project depending on itself (Befund 47)
+        if not dep.declared and _not_component(dep.name, dep.ecosystem):
+            continue  # ${ARGN} or the project depending on itself
         # A find_package behind an off-by-default option is an ALTERNATIVE —
         # it travels marked with its guard, never as a present component.
         if dep.condition:
@@ -229,6 +232,8 @@ def collect_components(
                 name=dep.name,
                 version=dep.version,
                 ecosystem=dep.ecosystem,
+                local_purl=dep.purl or "",
+                declared_range=dep.declared_range or "",
                 source_type=dep.source_kind or "build-file",
                 tier=_LOCKFILE_TIER,
                 confidence=_MANIFEST_CONFIDENCE,
@@ -256,7 +261,7 @@ def collect_components(
         ):
             continue
         # Parser noise the collector can judge without a DB — int/char/n
-        # (Befund 13); ambiguous names go to the server, which has the DB.
+        # ambiguous names go to the server, which has the DB.
         if not dep.declared and _is_parser_noise(dep.name, dep.version, dep.ecosystem):
             continue
         # Entries from jochwacht-deps.yaml are the customer's own SBOM
@@ -268,6 +273,8 @@ def collect_components(
                 name=dep.name,
                 version=dep.version,
                 ecosystem=dep.ecosystem,
+                local_purl=dep.purl or "",
+                declared_range=dep.declared_range or "",
                 source_type="declared",
                 tier=_LOCKFILE_TIER,
                 confidence=1.0,
@@ -286,6 +293,8 @@ def collect_components(
             name=dep.name,
             version=dep.version,
             ecosystem=dep.ecosystem,
+            local_purl=dep.purl or "",
+            declared_range=dep.declared_range or "",
             source_type="manifest" if is_floor else "lockfile",
             tier=_LOCKFILE_TIER,
             confidence=_MANIFEST_CONFIDENCE if is_floor else _LOCKFILE_CONFIDENCE,
@@ -313,8 +322,14 @@ def collect_components(
     seen_names = {normalize_dep_name(name) for name, _version in merged}
     for pdep in pipeline_deps:
         pdep.name = strip_control_chars(pdep.name)
-        if _not_component(pdep.name):
-            continue  # ${ARGN} or self-dependency (Befund 47)
+        # The Maven parser of the pipeline writes "group:artifact", the
+        # lockfile path and the purl "group/artifact": one spelling, or the
+        # same dependency comes twice and the second gets an invalid purl
+        # (measured 11.11.2026 with log4j-core 2.14.1).
+        if pdep.ecosystem in ("maven", "gradle") and ":" in pdep.name and "/" not in pdep.name:
+            pdep.name = pdep.name.replace(":", "/", 1)
+        if _not_component(pdep.name, pdep.ecosystem):
+            continue  # ${ARGN} or self-dependency
         if normalize_dep_name(pdep.name) in seen_names:
             continue
         # Already carried as a conditional alternative (path 1 scan_cmake):
@@ -339,7 +354,7 @@ def collect_components(
             and any(is_test_material_part(part) for part in src_parts)
         ):
             continue
-        # Scope mirrors the suite reconciler + scan_cmake exactly (Befund 75):
+        # Scope mirrors the suite reconciler + scan_cmake exactly:
         # excluded ⟺ test/example/contrib material, a known build tool, or a
         # project Find module that only locates a PROGRAM (Git, OpenSSLbins).
         # A pipeline `context` (an option guard the no-cache build can't
@@ -378,7 +393,7 @@ def collect_components(
         record_failure("build_output", "deploy/images/*.manifest | legal-info/manifest.csv", exc)
         build_output_deps, build_output_sources = [], []
     for dep in build_output_deps:
-        clean_dependency(dep)  # control-char hygiene (Befund 15)
+        clean_dependency(dep)  # control-char hygiene
         # Resolved, installed packages — the skip list never applies.
         key = (_identity(dep.name), dep.version)
         if key in merged:
@@ -387,12 +402,14 @@ def collect_components(
             name=dep.name,
             version=dep.version,
             ecosystem=dep.ecosystem,
+            local_purl=dep.purl or "",
+            declared_range=dep.declared_range or "",
             source_type="build-output",
             tier=_LOCKFILE_TIER,
             confidence=_LOCKFILE_CONFIDENCE,
         )
 
-    # Real components first, then the marked alternatives (Befund 44). The
+    # Real components first, then the marked alternatives. The
     # component COUNT and the ecosystem list cover only real components; the
     # conditional ones are surfaced through stats.conditional.
     real = list(merged.values())
@@ -421,7 +438,7 @@ def collect_components(
             if d.version:
                 _by_key[(d.name, d.ecosystem)].version = d.version
 
-    # Lifecycle mirrors the suite (Befund 52): a configured build (cache) or
+    # Lifecycle mirrors the suite: a configured build (cache) or
     # resolved output (lockfile / build output) is "build" provenance; only
     # declarations is "design"; nothing found stays "".
     from jochwacht_sbom.sbom.cmake_conditions import build_cmake_context
@@ -438,11 +455,15 @@ def collect_components(
         lifecycle = ""
 
     stats = CheckStats(
-        build_files_scanned=len(build_files),
+        build_files_scanned=len(
+            {p.resolve() for p, _kind in build_files} | {p.resolve() for p in manifest_files}
+        ),
         ecosystems=ecosystems,
         build_output_sources=build_output_sources,
+        own_project_entries=sorted(own_dropped),
         conditional=len(conditional_comps),
         lifecycle=lifecycle,
         go_versions_unresolved=go_versions_unresolved,
+        oversized_files=file_limit.skipped_names(),
     )
     return components, stats

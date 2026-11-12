@@ -17,9 +17,15 @@ from typing import TYPE_CHECKING
 from jochwacht_sbom.analyzer.models import BuildFileDependency
 from jochwacht_sbom.analyzer.parsers import PARSERS
 from jochwacht_sbom.analyzer.pipeline.base import ScanResult
+from jochwacht_sbom.core.file_limit import MAX_BUILD_FILE, note_skipped, too_large
+from jochwacht_sbom.core.log import get_logger
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from jochwacht_sbom.analyzer.parsers.cmake import CMakeProject
+
+logger = get_logger(__name__)
 
 # Map file_type → ecosystem for enrichment routing.
 _ECO_MAP: dict[str, str] = {
@@ -40,6 +46,12 @@ _CPP_TYPES: frozenset[str] = frozenset({
 _MIN_DB_ENTRIES_FOR_WHITELIST = 5000
 
 
+#: Largest build file this tier reads — the one limit (core.file_limit;
+#: a 65 MiB CMakeLists.txt was named as skipped by the walk and
+#: still read whole here).
+MAX_FILE_BYTES = MAX_BUILD_FILE
+
+
 class RegexScanner:
     """Adapter wrapping existing regex parsers as a TierScanner."""
 
@@ -55,6 +67,8 @@ class RegexScanner:
         self._is_skippable_dep: object = None
         self._cmake_to_conan: object = None
         self._whitelist_active: bool = False
+        # project root → its CMake files read once (targets, scopes, SDKs)
+        self._cmake_projects: dict[Path, CMakeProject] = {}
 
     def can_handle(self, file_type: str, project_path: Path) -> bool:
         """Handle any file type that has a regex parser."""
@@ -182,6 +196,36 @@ class RegexScanner:
 
         return result
 
+    def _cmake_project(self, project_path: Path) -> CMakeProject:
+        """Every target the project's CMake files define: a bare name in
+        target_link_libraries may be one of them, defined in another
+        directory (measured 12.11.2026: mosquitto 21, dyfusHAL 19 such names)."""
+        root = project_path.resolve()
+        cached = self._cmake_projects.get(root)
+        if cached is not None:
+            return cached
+        from jochwacht_sbom.analyzer.parsers.cmake import CMakeProject
+        from jochwacht_sbom.analyzer.scanner import collect_build_files
+
+        files: dict[str, str] = {}
+        for path, kind in collect_build_files(project_path):
+            if kind != "cmake":
+                continue
+            try:
+                # the one build-file limit, as for the scan itself
+                if path.stat().st_size > MAX_FILE_BYTES or too_large(path):
+                    continue
+                rel = path.resolve().relative_to(root).as_posix()
+                files[rel] = path.read_text(encoding="utf-8", errors="replace")
+            except (OSError, ValueError):
+                continue
+        project = CMakeProject.from_files(files)
+        if project.capped:
+            # counted, never silent
+            logger.warning("cmake_resolution_capped=%d in %s", project.capped, project_path)
+        self._cmake_projects[root] = project
+        return project
+
     def scan(self, file_type: str, file_path: Path, project_path: Path) -> ScanResult:
         """Parse the file with the matching regex parser."""
         parser = self._parsers.get(file_type)
@@ -189,11 +233,27 @@ class RegexScanner:
             return ScanResult(tier=self.tier, scanner_name=self.name)
 
         try:
+            if file_path.stat().st_size > MAX_FILE_BYTES or too_large(file_path):
+                note_skipped(file_path)
+                return ScanResult(tier=self.tier, scanner_name=self.name)
             content = file_path.read_text(encoding="utf-8", errors="replace")
         except OSError:
             return ScanResult(tier=self.tier, scanner_name=self.name)
 
         dep_names = parser(content)
+        if file_type == "cmake":
+            # bare names in target_link_libraries/link_libraries, never an
+            # own target of any CMake file of the project
+            from jochwacht_sbom.analyzer.parsers.cmake import link_names
+
+            project = self._cmake_project(project_path)
+            try:
+                rel = file_path.resolve().relative_to(project_path.resolve()).as_posix()
+            except ValueError:
+                rel = file_path.name
+            linked = link_names(content, project.targets, inherited=project.inherited(rel),
+                                sdks=project.sdks)
+            dep_names = [*dep_names, *(n for n in linked if n not in dep_names)]
 
         # For auto/lib/NAME/conf files (nginx pattern), add the directory name
         parts = file_path.parts

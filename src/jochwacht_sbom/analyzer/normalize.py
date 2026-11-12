@@ -22,6 +22,11 @@ _COMPONENT_SUFFIXES = (
 
 # CMake Find-module names often differ from pkg-config / canonical names.
 # Map normalized aliases → canonical normalized name.
+#: Link names that are a part of a package: the component carries the
+#: package's name, the one that has its key in the knowledge base
+#: (openssl has a CPE, ssl and crypto have none).
+LINK_NAME_PACKAGES: dict[str, str] = {"ssl": "openssl", "crypto": "openssl"}
+
 _ALIASES: dict[str, str] = {
     # pkg-config → canonical
     "cares": "c_ares",
@@ -68,8 +73,7 @@ _ALIASES: dict[str, str] = {
     "threads": "pthread",
     "pthreads": "pthread",
     # -l flag names → package names
-    "ssl": "openssl",
-    "crypto": "openssl",
+    **LINK_NAME_PACKAGES,
     "z": "zlib",
     # OpenCV-specific
     "onnxruntime": "onnx_runtime",

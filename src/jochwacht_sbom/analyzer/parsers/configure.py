@@ -13,6 +13,9 @@ from __future__ import annotations
 
 import re
 
+from jochwacht_sbom.analyzer.parsers.short_libs import short_library
+from jochwacht_sbom.analyzer.parsers.system_libs import is_system_library
+
 # Lists of library names in configure scripts:
 # EXTERNAL_LIBRARY_LIST="
 #     lib1
@@ -59,12 +62,11 @@ _LICENSE_DISABLED = re.compile(
 _SHELL_LINK_FLAGS = re.compile(
     r'(?:_libs|_LIBS|LDFLAGS|LDADD)\s*=\s*["\']([^"\']+)["\']',
 )
-_LFLAG = re.compile(r"-l(\w+)")
+_LFLAG = re.compile(r"-l(\w[\w.+-]*)")  # stdc++ is one name
 
 # System libs and platform-specific libs to skip (not SBOM deps)
+# (the C library and compiler runtime: system_libs, one list on every path)
 _SKIP_LIBS: set[str] = {
-    "c", "m", "dl", "rt", "pthread", "pthreads", "stdc++", "gcc",
-    "atomic", "resolv", "crypt", "util",
     # macOS frameworks captured by check_lib
     "applicationservices", "coregraphics", "coreimage", "coremedia",
     "corevideo", "coreservices", "corefoundation", "coretext",
@@ -110,7 +112,10 @@ def parse(content: str) -> list[str]:
     # check_lib — skip platform-specific and internal test entries
     for m in _CHECK_LIB.finditer(content):
         name = m.group(1)
-        if name and not name.startswith("_") and name.lower() not in _SKIP_LIBS:
+        if short_library(name):
+            deps.add(short_library(name))
+        elif (name and not name.startswith("_") and name.lower() not in _SKIP_LIBS
+                and not is_system_library(name.lower())):
             deps.add(name)
 
     # require_pkg_config
@@ -133,7 +138,9 @@ def parse(content: str) -> list[str]:
     for m in _SHELL_LINK_FLAGS.finditer(content):
         for lm in _LFLAG.finditer(m.group(1)):
             lib = lm.group(1)
-            if lib.lower() not in _SKIP_LIBS:
+            if short_library(lib):
+                deps.add(short_library(lib))
+            elif lib.lower() not in _SKIP_LIBS and not is_system_library(lib.lower()):
                 deps.add(lib)
 
     return sorted(deps)

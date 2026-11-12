@@ -105,9 +105,33 @@ CLIs for higher-fidelity results.
 
 **Nothing leaves your machine.** The default run transmits nothing.
 
-> **Note on `--send`:** the free CRA readiness report
-> this option was made for is no longer offered. Please do not use `--send`.
-> Use the local `sbom.cdx.json`.
+### Sending it to your Jochwacht subscription
+
+With a subscription, `--send` sends the SBOM written here to Jochwacht, and
+`jochwacht-sbom status` reads the result of that version — for example as two
+steps of a CI pipeline:
+
+```bash
+export JOCHWACHT_API_KEY=…            # from a secret of your pipeline, never on the command line
+jochwacht-sbom . --send --yes         # writes sbom.cdx.json and sends it
+jochwacht-sbom status --wait 600      # 0 green/yellow/waiting for a person, 1 red, 2 error
+```
+
+- The key comes from `JOCHWACHT_API_KEY`, the address from `JOCHWACHT_API_URL`
+  (default `https://api.jochwacht.dev`). Only https, no redirect is followed,
+  the key is never printed or saved.
+- With several products in the subscription, name one with `--product` or
+  `JOCHWACHT_PRODUCT`.
+- The answer of the send is kept in `.jochwacht/last-upload.json` (without the
+  key). `status` must run in the same directory, or get `--status-href`.
+- `status` asks again while the comparison still runs (`--wait`, seconds) and
+  always prints the ready line of the answer. `--preliminary` asks for the
+  result before a person looked (Premium).
+- You can send your own SBOM with `curl` instead; the setup page in the portal
+  shows the two lines.
+
+The old `--email`, `--voucher` and `--code` belonged to the free report, which
+is no longer offered; with `--send` they end with a message.
 
 ## What it reads
 

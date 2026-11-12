@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from jochwacht_sbom.collector import _project_name, collect_components
+from jochwacht_sbom.collector import _own_identities, collect_components
 
 
 def _write(tree: Path, rel: str, text: str) -> None:
@@ -53,12 +53,14 @@ class TestProjectName:
         tree.mkdir()
         (tree / "jochwacht.yaml").write_text(
             "project:\n  name: libwebsockets\n", encoding="utf-8")
-        assert _project_name(tree) == "libwebsockets"
+        assert ("libwebsockets", "") in _own_identities(tree)
 
-    def test_falls_back_to_directory(self, tmp_path: Path) -> None:
+    def test_never_the_directory_name(self, tmp_path: Path) -> None:
+        """The folder says where a checkout lives, not what the project is
+        called (a west workspace in a folder "zephyr" lost its module)."""
         tree = tmp_path / "libwebsockets"
         tree.mkdir()
-        assert _project_name(tree) == "libwebsockets"
+        assert _own_identities(tree) == frozenset()
 
 
 class TestBefund75:

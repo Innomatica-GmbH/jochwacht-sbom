@@ -1,4 +1,4 @@
-"""The local diagnosis file (order idee-fehlerrueckmeldung-sammler, 15.09.2026).
+"""The local diagnosis file.
 
 Three things are pinned here, each with a fabricated failure:
 
@@ -196,11 +196,13 @@ class TestReaderCrash:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         proj = _secret_project(tmp_path)
+        monkeypatch.setattr(check_cli, "_stdin_is_terminal", lambda: True)
         monkeypatch.setattr(check_cli.click, "confirm", lambda *a, **k: (_ for _ in ()).throw(
             check_cli.click.Abort(),
         ))
         res = CliRunner().invoke(
-            check_cli.main, [str(proj), "--send", "--email", "cto@example.com"],
+            check_cli.main, [str(proj), "--send"],
+            env={"JOCHWACHT_API_KEY": "jw_test_" + "k" * 24},
         )
         assert res.exit_code == 1
         assert "Aborted" in res.output

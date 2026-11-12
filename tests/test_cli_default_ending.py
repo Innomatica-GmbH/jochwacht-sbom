@@ -1,4 +1,4 @@
-"""0.9.1 — the default run ends in text, not a question (Ivan, 11.09.2026).
+"""0.9.1 — the default run ends in text, not a question.
 
 Red before: with a TTY the run asked "Send it to jochwacht now …? Send now?",
 printed "Your bill of materials is yours: …" and, on a second run, wrote
@@ -27,7 +27,7 @@ def _project(tmp_path: Path) -> Path:
 
 
 def _tty_run(args: list[str]):  # noqa: ANN202 — click Result
-    with patch("jochwacht_sbom.cli.upload_payload") as up, \
+    with patch("jochwacht_sbom.api.Client.upload") as up, \
          patch("sys.stdin.isatty", return_value=True), \
          patch("sys.stdout.isatty", return_value=True):
         res = CliRunner().invoke(main, args)
@@ -52,22 +52,24 @@ class TestNoQuestion:
 
     def test_without_a_tty_the_same_text(self, tmp_path: Path) -> None:
         proj = _project(tmp_path)
-        with patch("jochwacht_sbom.cli.upload_payload"):
+        with patch("jochwacht_sbom.api.Client.upload"):
             res = CliRunner().invoke(main, [str(proj)])
         assert res.exit_code == 0
         assert "Wrote sbom.cdx.json (1 component)." in res.output
         assert "Send now?" not in res.output
 
-    def test_send_path_keeps_preview_privacy_and_confirmation(self, tmp_path: Path) -> None:
+    def test_send_path_keeps_preview_and_confirmation(self, tmp_path: Path) -> None:
         proj = _project(tmp_path)
-        with patch("jochwacht_sbom.cli.upload_payload") as up:
+        with patch("jochwacht_sbom.api.Client.upload") as up, \
+             patch("jochwacht_sbom.cli._stdin_is_terminal", return_value=True):
             res = CliRunner().invoke(
-                main, [str(proj), "--send", "--email", "a@b.de"], input="n\n",
+                main, [str(proj), "--send"], input="n\n",
+                env={"JOCHWACHT_API_KEY": "jw_test_" + "k" * 24},
             )
         assert res.exit_code == 0, res.output
         up.assert_not_called()
         assert "This would be sent" in res.output
-        assert "jochwacht.dev/check-privacy" in res.output
+        assert "api.jochwacht.dev" in res.output          # where it would go
         assert "Nothing was sent" in res.output
 
 

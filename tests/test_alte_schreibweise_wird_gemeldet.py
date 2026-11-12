@@ -1,7 +1,7 @@
 """Eine Erklärungsdatei, die anders heißt, wird nicht gelesen — und wir sagen es.
 
 Die Umbenennung vom 01.10.2026 ist vollständig: ein Name je Datei, keine
-Verträglichkeitsschicht (Ivan, 02.10.2026). Was nicht stehen bleiben darf,
+Verträglichkeitsschicht. Was nicht stehen bleiben darf,
 ist das SCHWEIGEN darüber: eine von Hand eingetragene Erklärung ist die eine
 Angabe, die sonst nichts rekonstruieren kann, und sie wortlos fallen zu
 lassen ist ein Messverlust, den niemand bemerkt.

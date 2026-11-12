@@ -38,20 +38,25 @@ def _assert_gone(text: str) -> None:
         assert phrase not in low, (phrase, text)
 
 
-def test_help_marks_send_deprecated() -> None:
+def test_help_names_the_subscription_send() -> None:
+    """12.11.2026: --send sends to the subscription; the free report stays gone."""
     res = CliRunner().invoke(main, ["--help"])
     assert res.exit_code == 0
-    assert "Deprecated: the free report is no longer offered." in " ".join(res.output.split())
+    text = " ".join(res.output.split())
+    assert "JOCHWACHT_API_KEY" in text and "subscription" in text
     _assert_gone(res.output)
 
 
 def test_send_success_promises_nothing(tmp_path: Path) -> None:
     proj = _project(tmp_path)
-    with patch("jochwacht_sbom.cli.upload_payload", return_value="CHK-1") as up:
-        res = CliRunner().invoke(main, [str(proj), "--send", "--email", "a@b.de", "--yes"])
+    answer = {"status": "new", "product": "prd_1", "version": 5, "components": 1,
+              "status_href": "/api/v1/products/prd_1/sbom-versions/5/status"}
+    with patch("jochwacht_sbom.api.Client.upload", return_value=answer) as up:
+        res = CliRunner().invoke(main, [str(proj), "--send", "--yes"],
+                                 env={"JOCHWACHT_API_KEY": "jw_test_" + "k" * 24})
     assert res.exit_code == 0, res.output
     up.assert_called_once()
-    assert "Reference: CHK-1." in res.output
+    assert "version 5" in res.output
     _assert_gone(res.output)
 
 

@@ -30,9 +30,9 @@ import json
 import os
 import re
 import shutil
+import stat as stat_mod
 import subprocess
 import tomllib
-import xml.etree.ElementTree as ET
 from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -42,7 +42,10 @@ import yaml
 from pydantic import BaseModel, Field
 
 from jochwacht_sbom import filenames as file_names
+from jochwacht_sbom.core import xmlsafe
+from jochwacht_sbom.core.file_limit import MAX_BUILD_FILE, note_skipped, too_large
 from jochwacht_sbom.core.log import get_logger
+from jochwacht_sbom.core.xmlsafe import Element, ParseError
 from jochwacht_sbom.diagnosis import record_failure
 from jochwacht_sbom.sbom import markers as markers_mod
 from jochwacht_sbom.sbom.cmake_conditions import (
@@ -70,7 +73,7 @@ def is_version_range(version: str) -> bool:
 
     ``^4.18.0``, ``~6.5.2``, ``>=2.0``, ``1.2 || 2.0``, ``4.x``, ``*`` —
     CycloneDX demands a concrete version; a range in that field is a
-    false statement an assessor cannot check (Befund 30).
+    false statement an assessor cannot check.
     """
     v = version.strip()
     if not v:
@@ -93,11 +96,11 @@ class Dependency(BaseModel):
     #: True for a NESTED npm copy (node_modules/a/node_modules/b): it
     #: is installed and belongs in the SBOM, but it must never be
     #: compared against the project's own declaration — that invented
-    #: the "globals 14.0.0 erfüllt ^15.12.0 nicht"-conflict (Befund 28).
+    #: the "globals 14.0.0 erfüllt ^15.12.0 nicht"-conflict.
     nested: bool = False
     #: The DECLARED range when no resolved version exists ("^4.18.0",
     #: "~6.5.2", ">=2.0"). A range is a wish, not a version — it never
-    #: goes into the CycloneDX version field (Befund 30); the generator
+    #: goes into the CycloneDX version field; the generator
     #: emits it as the property ``jochwacht:declared-range`` instead.
     declared_range: str = ""
     license: str | None = None
@@ -109,7 +112,7 @@ class Dependency(BaseModel):
     #: set (no toolchain / no buildable package / error) and the scan fell
     #: back to go.sum, which lists ALL versions including superseded ones.
     #: The collector carries this into the payload so the server records the
-    #: note (CRA, Ivan 30.10.2026).
+    #: note.
     versions_unresolved: bool = False
     # Provenance class of the version: "" = resolved/pinned (lockfile or
     # exact pin), "manifest" = a constraint-derived minimum from a manifest
@@ -121,7 +124,7 @@ class Dependency(BaseModel):
     # "" = unknown. npm lockfile v2/v3 marks pure build tooling with
     # dev/devOptional → "excluded" (never ships in the artefact); this is
     # SBOM honesty, NOT a query filter — dev components are still checked
-    # for vulnerabilities (order osv-chunking A4).
+    # for vulnerabilities.
     scope: str = ""
     #: Why ``scope`` was set, when the lockfile alone does not show it —
     #: today: a PEP 508 marker that is false for every declared target
@@ -137,7 +140,7 @@ class Dependency(BaseModel):
     # A declaration is authoritative (its supplier/license/purl/cpe were
     # stated on purpose, they beat anything a database could guess) and,
     # for the check collector, it is the ONLY class of component whose
-    # metadata may travel in the payload (order report-vollstaendigkeit).
+    # metadata may travel in the payload.
     declared: bool = False
     #: Version of the DISTRIBUTION package the build links against
     #: (``3.0.13-0ubuntu3.15``) — the patch level that decides which CVEs
@@ -154,7 +157,7 @@ class Dependency(BaseModel):
     #: view whose advisories decide the shipped patch level.
     distro_ecosystem: str = ""
     #: A CMake find_package guarded by an off-by-default option() is an
-    #: ALTERNATIVE, not a present component (Befund 38). When set, this
+    #: ALTERNATIVE, not a present component. When set, this
     #: carries the plain-text guard ("nur bei: PAHO_WITH_LIBRESSL") and the
     #: entry must never be reported as confirmed — the customer decides
     #: which backend they build. Empty for unconditional dependencies.
@@ -226,7 +229,7 @@ def _make_purl(ecosystem: str, name: str, version: str) -> str:
         purl_name = name
 
     # No version, no "@": "pkg:npm/express@" is not a valid purl, and a
-    # range there would be a false statement (Befund 30).
+    # range there would be a false statement.
     if not version or version == "*" or is_version_range(version):
         return f"pkg:{purl_type}/{purl_name}"
     return f"pkg:{purl_type}/{purl_name}@{version}"
@@ -332,35 +335,45 @@ def scan_requirements_txt(
     """
     deps: list[Dependency] = []
     try:
-        lines = path.read_text(encoding="utf-8").splitlines()
+        text = path.read_text(encoding="utf-8")
     except OSError as exc:
         logger.warning("Failed to read %s: %s", path, exc)
         return deps
 
-    for line in lines:
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#") or stripped.startswith("-"):
+    for stripped in requirement_lines(text):
+        url = ""
+        if stripped.startswith(("-e ", "--editable ", "--editable=")):
+            url = re.sub(r"^(?:-e|--editable)[ =]\s*", "", stripped)
+        elif _VCS_OR_URL.match(stripped):
+            url = stripped
+        if url:
+            # a VCS or archive URL names a component without a version we
+            # could state; a local path is the project's own
+            name = url_requirement_name(url) if _VCS_OR_URL.match(url) else ""
+            if name:
+                deps.append(Dependency(
+                    name=name, version="", ecosystem="pypi",
+                    purl=_make_purl("pypi", name, ""), source_kind="manifest",
+                    declared_range=url.split(";", 1)[0].strip(),
+                ))
             continue
-        # pip treats "#" as a comment, and it has to be cut BEFORE the
-        # marker is split off: otherwise "pkg ; marker  # note" makes the
-        # marker unparsable and "pkg  # ticket #12; reason" invents one.
-        ohne_kommentar = _strip_requirement_comment(stripped)
-        if not ohne_kommentar:
-            continue
+        if stripped.startswith("-"):
+            continue                                   # -r, -c, --index-url, …
+        ohne_kommentar = stripped
         anforderung, _, marker_text = ohne_kommentar.partition(";")
-        # Match: package==version or package>=version etc.
-        match = re.match(
-            r"^([a-zA-Z0-9_.-]+)\s*([=~!<>]=*)\s*([a-zA-Z0-9._*-]+)", anforderung.strip()
-        )
-        if match:
-            name, operator, version = match.group(1), match.group(2), match.group(3)
+        parts = pep508_parts(anforderung)
+        if parts:
+            name, version, declared = parts
             dep = Dependency(
                 name=name,
                 version=version,
                 ecosystem="pypi",
                 purl=_make_purl("pypi", name, version),
-                # ">=1.2" names a floor, not the deployed version.
-                source_kind="" if operator == "==" else "manifest",
+                # only an exact pin is a version; ">=1.2" names a floor
+                #: no version, the range
+                # stays declared
+                source_kind="" if version else "manifest",
+                declared_range=declared,
             )
             _apply_markers(dep, [marker_text.strip()] if marker_text.strip() else [],
                            target_envs, path)
@@ -375,6 +388,48 @@ def scan_requirements_txt(
 _PYPROJECT_REQ_RE = re.compile(
     r"^([A-Za-z0-9][A-Za-z0-9._-]*)\s*(?:\[[^\]]*\])?\s*[=~!<>]=*\s*([A-Za-z0-9._*-]+)"
 )
+#: A PEP 508 requirement split: name, extras, the version part (operators on).
+_PEP508_PARTS_RE = re.compile(
+    r"^([A-Za-z0-9][A-Za-z0-9._-]*)\s*(?:\[[^\]]*\])?\s*([=~!<>@(].*)?$")
+_PEP440_PIN = re.compile(r"===?\s*([A-Za-z0-9][A-Za-z0-9._+!-]*)")
+
+
+def pep440_version_fields(spec: str) -> tuple[str, str]:
+    """``(pinned version, declared range)`` of a PEP 440 version part. Only
+    one exact pin is a version; a floor, a compatible release, an upper
+    bound, an exclusion or several clauses name no installed version."""
+    text = " ".join((spec or "").split()).strip("() ")
+    if not text:
+        return "", ""
+    clauses = [c.strip() for c in text.split(",") if c.strip()]
+    if len(clauses) == 1:
+        m = _PEP440_PIN.fullmatch(clauses[0])
+        if m and "*" not in m.group(1):
+            return m.group(1), ""
+    return "", text
+
+
+def pep508_parts(requirement: str) -> tuple[str, str, str] | None:
+    """``(name, pinned version, declared range)`` of a PEP 508 requirement
+    (marker already cut), or None when it is no named requirement."""
+    m = _PEP508_PARTS_RE.match(requirement.strip())
+    if m is None:
+        return None
+    version, declared = pep440_version_fields(m.group(2) or "")
+    return m.group(1), version, declared
+
+
+def poetry_version_fields(spec: object) -> tuple[str, str]:
+    """``(pinned version, declared range)`` of a Poetry specifier: a bare
+    version and ``==x`` are exact; ``^8.1``, ``~1.2``, ``>=1,<2`` are not."""
+    if isinstance(spec, dict):
+        spec = spec.get("version", "")
+    if not isinstance(spec, str):
+        return "", ""
+    text = spec.strip()
+    if re.fullmatch(r"[0-9][A-Za-z0-9._+-]*", text):
+        return text, ""
+    return pep440_version_fields(text)
 
 
 def _poetry_spec_version(spec: object) -> str:
@@ -400,8 +455,12 @@ def scan_pyproject_toml(path: Path) -> list[Dependency]:
     skipped (no concrete version to put into an SBOM).
     """
     deps: list[Dependency] = []
+    from jochwacht_sbom.sbom.dev_scope import usable_lock
+
     for lockfile in ("poetry.lock", "uv.lock"):
-        if path.with_name(lockfile).is_file():
+        # Only a USABLE lockfile stands in for pyproject.toml; an unusable
+        # one is skipped by its reader, and then this file counts.
+        if path.with_name(lockfile).is_file() and usable_lock(path.with_name(lockfile)):
             logger.info("Skipping %s — %s present", path, lockfile)
             return deps
 
@@ -411,52 +470,45 @@ def scan_pyproject_toml(path: Path) -> list[Dependency]:
         logger.warning("Failed to parse %s: %s", path, exc)
         return deps
 
-    def _add(name: str, version: str) -> None:
-        if name and version and version != "*":
+    from jochwacht_sbom.sbom.dev_scope import (
+        poetry_dependency_tables,
+        pyproject_requirements,
+        strongest_per_name,
+    )
+
+    def _add(name: str, version: str, scope: str, reason: str, declared: str = "") -> None:
+        if name:
             deps.append(Dependency(
                 name=name,
                 version=version,
                 ecosystem="pypi",
                 purl=_make_purl("pypi", name, version),
-                # pyproject constraints are floors/ranges, not resolved
-                # versions — only a lockfile knows what is deployed.
-                source_kind="manifest",
+                # an exact pin is a version; a floor or range is none — the
+                # version is unknown, the range stays declared.
+                source_kind="" if version else "manifest",
+                declared_range=declared,
+                # Runtime required, extras optional, development groups
+                # excluded with their name (shared rule, sbom/dev_scope.py).
+                scope=scope,
+                scope_reason=reason,
             ))
 
-    # PEP 621 [project.dependencies] / [project.optional-dependencies]
-    # and PEP 735 [dependency-groups]
-    project = data.get("project", {})
-    req_lists: list[object] = [project.get("dependencies", [])]
-    req_lists.extend(project.get("optional-dependencies", {}).values())
-    req_lists.extend(data.get("dependency-groups", {}).values())
-    for req_list in req_lists:
-        if not isinstance(req_list, list):
-            continue
-        for req in req_list:
-            if not isinstance(req, str):
-                continue  # PEP 735 include-group tables
-            match = _PYPROJECT_REQ_RE.match(req.strip())
-            if match:
-                _add(match.group(1), match.group(2))
+    project = data.get("project")
+    own = project.get("name") if isinstance(project, dict) else None
+    own_key = re.sub(r"[-_.]+", "-", own).lower() if isinstance(own, str) else ""
+    for req, scope, reason in pyproject_requirements(data):
+        parts = pep508_parts(req.split(";", 1)[0])
+        # the project naming itself in its own groups is no component
+        if parts and re.sub(r"[-_.]+", "-", parts[0]).lower() != own_key:
+            _add(parts[0], parts[1], scope, reason, parts[2])
 
-    # Poetry: [tool.poetry.dependencies] / dev-dependencies / group.*.dependencies
-    poetry = data.get("tool", {}).get("poetry", {})
-    poetry_tables: list[object] = [
-        poetry.get("dependencies", {}),
-        poetry.get("dev-dependencies", {}),
-    ]
-    poetry_tables.extend(
-        group.get("dependencies", {})
-        for group in poetry.get("group", {}).values()
-        if isinstance(group, dict)
-    )
-    for table in poetry_tables:
-        if not isinstance(table, dict):
-            continue
+    for table, scope, reason in poetry_dependency_tables(data):
         for name, spec in table.items():
             if name == "python":
                 continue
-            _add(name, _poetry_spec_version(spec))
+            version, declared = poetry_version_fields(spec)
+            _add(name, version, scope, reason, declared)
+    deps[:] = strongest_per_name(deps)
 
     logger.info("Found %d dependencies in %s", len(deps), path)
     return deps
@@ -490,6 +542,63 @@ def scan_poetry_lock(
 
     logger.info("Found %d dependencies in %s", len(deps), path)
     return deps
+
+
+def requirement_lines(text: str) -> list[str]:
+    """The logical lines of a requirements file: a line ending in ``\\``
+    continues on the next (pip-compile --generate-hashes writes every pin
+    so), comments cut, pip's per-requirement options (``--hash``,
+    ``--config-settings``, ``--global-option`` …) cut off:
+    "requests==2.31.0 \\" with hash lines lost its version."""
+    logical: list[str] = []
+    buf = ""
+    for raw in text.splitlines():
+        line = raw.rstrip()
+        # pip's join_lines: a line that IS a comment (COMMENT_RE.match,
+        # "#" at its start or after leading whitespace) ends a continuation,
+        # even when it ends in "\\" (measured with pip 25.0.1:
+        # "six==1.16.0 \\" / "# note \\" / "attrs==23.2.0" gives both). A
+        # comment AFTER a pin ("requests==2.31.0 # note \\") does continue, as
+        # in pip: the next line goes into the comment.
+        if re.match(r"(^|\s+)#", line):
+            logical.append(buf + " " + line if buf else line)
+            buf = ""
+            continue
+        if line.endswith("\\"):
+            buf += line[:-1] + " "
+            continue
+        logical.append(buf + line)
+        buf = ""
+    if buf:
+        logical.append(buf)
+    out: list[str] = []
+    for line in logical:
+        line = _strip_requirement_comment(line.strip())
+        if not line:
+            continue
+        if not line.startswith("-"):
+            m = re.search(r"\s--?[A-Za-z]", line)
+            if m:
+                line = line[: m.start()].strip()
+        if line:
+            out.append(line)
+    return out
+
+
+_VCS_OR_URL = re.compile(r"^(?:git|hg|svn|bzr)\+|^[A-Za-z][A-Za-z0-9+.-]*://")
+_ARCHIVE_NAME = re.compile(
+    r"([A-Za-z0-9][A-Za-z0-9._]*?)-[0-9][^/]*?(?:\.whl|\.tar\.gz|\.zip|\.tar\.bz2)$")
+
+
+def url_requirement_name(url: str) -> str:
+    """The project name of a URL requirement: ``#egg=name`` first, else the
+    archive's file name (``pkg-1.0-py3-none-any.whl``), else ``""``."""
+    m = re.search(r"[#&]egg=([A-Za-z0-9][A-Za-z0-9._-]*)", url)
+    if m:
+        return m.group(1)
+    tail = url.split("#", 1)[0].split("?", 1)[0].rstrip("/").rsplit("/", 1)[-1]
+    m = _ARCHIVE_NAME.fullmatch(tail)
+    return m.group(1) if m else ""
 
 
 def _strip_requirement_comment(line: str) -> str:
@@ -651,36 +760,52 @@ def scan_uv_lock(
         logger.warning("Failed to parse %s: %s", path, exc)
         return deps
 
-    # Edges only when they are needed: the marker question. This reader
-    # still has no dev-scope closure — that difference to the suite is a
-    # deliberate simplification of the twin and stays.
+    # The same scope rule as the suite (sbom/dev_scope.py, block 5): what
+    # the members' dependencies reach is required, what only their extras
+    # reach optional, what only dev groups reach excluded.
+    edges: dict[str, set[str]] = {}
     marked_edges: dict[str, list[tuple[str, str]]] = {}
     roots: set[str] = set()
+    main_roots: set[str] = set()
+    extra_roots: set[str] = set()
     members = 0
 
-    for pkg in data.get("package", []):
+    packages = data.get("package", [])
+    if not isinstance(packages, list):
+        # Unexpected form: skipped and named, the run goes on.
+        logger.warning("Skipped %s: 'package' is not a list", path)
+        return deps
+    for pkg in packages:
+        if not isinstance(pkg, dict):
+            continue
         name = pkg.get("name", "")
         version = pkg.get("version", "")
+        if not isinstance(name, str) or not isinstance(version, str):
+            continue        # "name = 5": skipped, not a TypeError
         source = pkg.get("source", {})
         kanten: list[tuple[str, str]] = []
-        if target_envs:
-            for gruppe in [pkg.get("dependencies") or []] + list(
-                (pkg.get("optional-dependencies") or {}).values()
-            ):
-                for rel in gruppe or []:
-                    if isinstance(rel, dict) and rel.get("name"):
-                        kanten.append((
-                            _normalise_package_name(str(rel["name"])),
-                            str(rel.get("marker") or ""),
-                        ))
-            if name:
-                marked_edges.setdefault(
-                    _normalise_package_name(name), []).extend(kanten)
+        main_children: set[str] = set()
+        extras = pkg.get("optional-dependencies") or {}
+        for nr, gruppe in enumerate([pkg.get("dependencies") or []] + list(
+            extras.values() if isinstance(extras, dict) else []
+        )):
+            for rel in gruppe or []:
+                if isinstance(rel, dict) and rel.get("name"):
+                    kind = _normalise_package_name(str(rel["name"]))
+                    kanten.append((kind, str(rel.get("marker") or "")))
+                    if nr == 0:
+                        main_children.add(kind)
+        children = {k for k, _ in kanten}
+        if name:
+            marked_edges.setdefault(_normalise_package_name(name), []).extend(kanten)
+            edges.setdefault(_normalise_package_name(name), set()).update(children)
         if isinstance(source, dict) and (
             "editable" in source or "virtual" in source or "directory" in source
         ):
             members += 1
-            roots.update(k for k, _ in kanten)
+            roots.update(children)
+            main_roots.update(main_children)
+            extra_roots.update(children - main_children)
             continue
         if name and version:
             dep = Dependency(
@@ -695,6 +820,10 @@ def scan_uv_lock(
             _apply_markers(dep, roh, target_envs, path)
             deps.append(dep)
 
+    if members and roots:
+        from jochwacht_sbom.sbom.dev_scope import closure_scope
+
+        closure_scope(deps, edges, main_roots, extra_roots, key=_normalise_package_name)
     if target_envs and members and roots:
         _mark_unreachable_under_markers(deps, marked_edges, roots, target_envs)
 
@@ -762,7 +891,6 @@ def scan_vcpkg_json(path: Path) -> list[Dependency]:
     for entry in data.get("dependencies", []):
         if isinstance(entry, str):
             # No pinned version — "" is the honest value, never "*"
-            # (order collector-embedded-buildsysteme Punkt 5).
             deps.append(Dependency(
                 name=entry,
                 version="",
@@ -784,18 +912,12 @@ def scan_vcpkg_json(path: Path) -> list[Dependency]:
     return deps
 
 
-_CMAKE_FETCH_CONTENT = re.compile(
-    r"FetchContent_Declare\s*\(\s*(\w+).*?GIT_TAG\s+([v]?[\w._-]+)",
-    re.DOTALL | re.IGNORECASE,
-)
-
-
 def scan_cmake(
     path: Path, *, cmake_ctx: CMakeContext | None = None,
 ) -> list[Dependency]:
     """Best-effort scan of CMakeLists.txt for FetchContent and find_package.
 
-    ``find_package`` is classified branch-, option- and cache-aware (Befund 38):
+    ``find_package`` is classified branch-, option- and cache-aware:
     a call behind an off-by-default ``option()`` is an ALTERNATIVE — it carries
     its guard in :attr:`Dependency.condition` and is never reported as present.
     A ``CMakeCache.txt`` in the tree decides the build: branches not taken are
@@ -809,13 +931,17 @@ def scan_cmake(
         logger.warning("Failed to read %s: %s", path, exc)
         return deps
 
-    for match in _CMAKE_FETCH_CONTENT.finditer(content):
-        name, version = match.group(1), match.group(2)
+    # Each declaration read up to its own ")" (shared reader, as in the
+    # suite): version from GIT_TAG or the URL archive; a branch is none.
+    from jochwacht_sbom.analyzer.parsers.cmake import fetch_content_declarations
+
+    for decl in fetch_content_declarations(content):
         deps.append(Dependency(
-            name=name,
-            version=version,
+            name=decl.name,
+            version=decl.version,
             ecosystem="cmake",
-            purl=_make_purl("cmake", name, version),
+            purl=_make_purl("cmake", decl.name, decl.version),
+            declared_range=decl.declared_range,
         ))
 
     ctx = cmake_ctx if cmake_ctx is not None else build_cmake_context(path.parent)
@@ -829,7 +955,7 @@ def scan_cmake(
         source_kind = "manifest"
         scope = ""
         condition = ""
-        # Tooling is never a decision for the customer (Befund 57): a known
+        # Tooling is never a decision for the customer: a known
         # build tool (Git) or a project Find module that only locates a
         # PROGRAM (OpenSSLbins) travels marked excluded — listed, never asked.
         if hit.name in ctx.program_modules or is_build_tool(hit.name):
@@ -864,57 +990,10 @@ def scan_cmake(
 
 
 def scan_west_manifest(path: Path) -> list[Dependency]:
-    """Parse a Zephyr ``west.yml`` manifest (the authoritative module list).
+    """Parse a Zephyr ``west.yml`` — shared code in :mod:`jochwacht_sbom.sbom.west`."""
+    from jochwacht_sbom.sbom.west import read_west_manifest
 
-    The west manifest is the registry of the Zephyr world: every module
-    with its repository and pinned revision (order
-    wissensdatenbank-abdeckung-embedded, Stufe 4 — without this parser
-    a Zephyr workspace scan missed its entire dependency declaration).
-    The revision is taken verbatim as the version: tags are meaningful
-    versions, commit hashes are at least an exact pin — never a guess.
-    """
-    deps: list[Dependency] = []
-    try:
-        data = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except (yaml.YAMLError, OSError) as exc:
-        logger.warning("Failed to parse %s: %s", path, exc)
-        return deps
-
-    manifest = data.get("manifest") if isinstance(data, dict) else None
-    if not isinstance(manifest, dict):
-        return deps
-
-    remotes = {
-        str(r.get("name", "")): str(r.get("url-base", ""))
-        for r in manifest.get("remotes", []) or []
-        if isinstance(r, dict)
-    }
-    default_remote = str(
-        (manifest.get("defaults") or {}).get("remote", "")
-    ) or (next(iter(remotes), ""))
-
-    for project in manifest.get("projects", []) or []:
-        if not isinstance(project, dict):
-            continue
-        name = str(project.get("name", ""))
-        revision = str(project.get("revision", ""))
-        if not name or not revision:
-            continue
-        repo_path = str(project.get("repo-path", "") or name)
-        base = remotes.get(str(project.get("remote", "")) or default_remote, "")
-        purl = None
-        if base.startswith("https://github.com/"):
-            org = base[len("https://github.com/"):].strip("/")
-            purl = f"pkg:github/{org}/{repo_path}@{revision}"
-        deps.append(Dependency(
-            name=name,
-            version=revision,
-            ecosystem="github",
-            purl=purl or _make_purl("generic", name, revision),
-        ))
-
-    logger.info("Found %d west modules in %s", len(deps), path)
-    return deps
+    return read_west_manifest(path)
 
 
 def scan_jochwacht_deps(path: Path) -> list[Dependency]:
@@ -940,7 +1019,7 @@ def scan_jochwacht_deps(path: Path) -> list[Dependency]:
             ecosystem = str(entry.get("ecosystem") or "manual")
             # A declared purl/cpe wins over anything synthesized — the Zynq
             # demo declared 57 purls and 3 CPEs that this parser silently
-            # dropped (order report-vollstaendigkeit P0).
+            # dropped.
             deps.append(Dependency(
                 name=name,
                 version=str(version),
@@ -1020,7 +1099,7 @@ def scan_package_lock_json(path: Path) -> list[Dependency]:
             parts = pkg_path.split("node_modules/")
             name = parts[-1] if parts else pkg_path
             # More than one "node_modules/" = a nested copy another
-            # package pins for itself (Befund 28: position in the tree,
+            # package pins for itself (position in the tree,
             # not the name, decides what a declaration compares against).
             nested = len(parts) > 2
             # npm lockfile v2/v3 provenance: dev/devOptional = build
@@ -1201,7 +1280,7 @@ def scan_gradle_lockfile(path: Path) -> list[Dependency]:
 _MAVEN_NS = "{http://maven.apache.org/POM/4.0.0}"
 
 
-def _get_pom_own_group_id(root: ET.Element, ns: str) -> str:
+def _get_pom_own_group_id(root: Element, ns: str) -> str:
     """Extract the project's own groupId from a pom.xml root element.
 
     Falls back to the parent groupId if the project does not declare its own.
@@ -1231,8 +1310,8 @@ def scan_pom_xml(path: Path) -> list[Dependency]:
     """
     deps: list[Dependency] = []
     try:
-        tree = ET.parse(path)  # noqa: S314
-    except (ET.ParseError, OSError) as exc:
+        tree = xmlsafe.parse(path)   # no DOCTYPE, no entities
+    except (ParseError, OSError) as exc:
         logger.warning("Failed to parse %s: %s", path, exc)
         return deps
 
@@ -1506,7 +1585,7 @@ def scan_alire_lock(path: Path) -> list[Dependency]:
 
 
 # ---------------------------------------------------------------------------
-# NuGet / .NET (order nuget-scanner, Ivan 14.09.2026)
+# NuGet / .NET
 # ---------------------------------------------------------------------------
 
 #: MSBuild project files that may carry ``<PackageReference>`` (SDK style).
@@ -1520,7 +1599,7 @@ _NUGET_CPM_MAX_UP = 8
 _NUGET_INTERVAL = re.compile(r"^\s*([\[(])\s*([^,\])\s]*)\s*(?:,\s*([^\])\s]*)\s*)?([\])])\s*$")
 
 
-def _msbuild_tag(el: ET.Element) -> str:
+def _msbuild_tag(el: Element) -> str:
     """Local tag name — old-style project files carry the MSBuild namespace."""
     tag = el.tag if isinstance(el.tag, str) else ""
     return tag.rsplit("}", 1)[-1]
@@ -1628,8 +1707,8 @@ def _central_package_versions(start: Path) -> dict[str, str]:
         if props.is_file():
             versions: dict[str, str] = {}
             try:
-                root = ET.parse(props).getroot()  # noqa: S314
-            except (ET.ParseError, OSError) as exc:
+                root = xmlsafe.parse(props).getroot()   # no DOCTYPE, no entities
+            except (ParseError, OSError) as exc:
                 logger.warning("Failed to parse %s: %s", props, exc)
                 return versions
             for el in root.iter():
@@ -1650,14 +1729,14 @@ def scan_msbuild_project(path: Path) -> list[Dependency]:
     ``VersionOverride``, or Central Package Management
     (Directory.Packages.props). ``Update=`` items only edit references
     declared elsewhere and add nothing. A range, floating or property
-    version is kept as ``declared_range`` with an empty version (Befund 30).
+    version is kept as ``declared_range`` with an empty version.
     Where a packages.lock.json exists, :func:`prefer_locked` drops these
     floors in favour of the resolved versions.
     """
     deps: list[Dependency] = []
     try:
-        root = ET.parse(path).getroot()  # noqa: S314
-    except (ET.ParseError, OSError) as exc:
+        root = xmlsafe.parse(path).getroot()   # no DOCTYPE, no entities
+    except (ParseError, OSError) as exc:
         logger.warning("Failed to parse %s: %s", path, exc)
         return deps
     central: dict[str, str] | None = None
@@ -1700,8 +1779,8 @@ def scan_packages_config(path: Path) -> list[Dependency]:
     """
     deps: list[Dependency] = []
     try:
-        root = ET.parse(path).getroot()  # noqa: S314
-    except (ET.ParseError, OSError) as exc:
+        root = xmlsafe.parse(path).getroot()   # no DOCTYPE, no entities
+    except (ParseError, OSError) as exc:
         logger.warning("Failed to parse %s: %s", path, exc)
         return deps
     for el in root.iter():
@@ -1902,8 +1981,8 @@ def scan_libero_cxf(path: Path) -> list[Dependency]:
     """
     deps: list[Dependency] = []
     try:
-        root = ET.parse(path).getroot()
-    except (ET.ParseError, OSError) as exc:
+        root = xmlsafe.parse(path).getroot()   # no DOCTYPE, no entities
+    except (ParseError, OSError) as exc:
         logger.warning("Failed to parse %s: %s", path, exc)
         return deps
 
@@ -2002,7 +2081,7 @@ _SCANNERS: dict[str, tuple[str, type[object] | None]] = {
     "pom.xml": ("pom_xml", None),
     "go.sum": ("go", None),
     "alire.lock": ("alire_lock", None),
-    # NuGet / .NET (order nuget-scanner, nachgezogen aus der Suite 0.15.66):
+    # NuGet / .NET:
     # the lockfile is the resolved truth, packages.config the classic
     # installed set, Directory.Build.props a solution-wide manifest.
     # *.csproj/*.fsproj/*.vbproj are matched by suffix in scan_directory.
@@ -2067,11 +2146,47 @@ def _read_with(
 _MARKER_AWARE = frozenset({"uv_lock", "poetry_lock", "requirements_txt"})
 
 
+#: Largest lockfile or build file read by the tree walk. A
+#: larger one is skipped and named, never read. The one limit of every
+#: reader (core.file_limit).
+MAX_LOCKFILE = MAX_BUILD_FILE
+
+
+def _readable(file: Path, root: Path) -> bool:
+    """Whether the walk may read *file*: inside *root* with links resolved,
+    a regular file, at most MAX_LOCKFILE bytes. An oversized file is named."""
+    if not _inside_root(file, root):
+        return False
+    try:
+        st = file.stat()
+    except OSError:
+        return False
+    if not stat_mod.S_ISREG(st.st_mode):
+        return False
+    if st.st_size > MAX_LOCKFILE or too_large(file):
+        note_skipped(file)                  # named once, counted by the collector
+        return False
+    return True
+
+
+def _inside_root(file: Path, root: Path | None) -> bool:
+    """Whether *file*, links resolved, lies inside *root* (no root: yes).
+    The tree walk must not read a lockfile that is a link out of the tree."""
+    if root is None:
+        return True
+    try:
+        return file.resolve().is_relative_to(root)
+    except OSError:
+        return False
+
+
 def scan_directory(
     path: Path, *, fpga_recursive: bool = True,
     cmake_ctx: CMakeContext | None = None,
     cmake_extra_cache: Path | None = None,
     target_envs: list[TargetEnv] | None = None,
+    read_files: list[Path] | None = None,
+    root: Path | None = None,
 ) -> list[Dependency]:
     """Auto-detect and scan all supported dependency files in a directory.
 
@@ -2082,7 +2197,7 @@ def scan_directory(
             tree, so they are matched by suffix, not by fixed filename).
             :func:`scan_directory_recursive` disables this — its own walk
             visits every directory anyway.
-        cmake_ctx: Project-wide CMake option/cache context (Befund 41). When
+        cmake_ctx: Project-wide CMake option/cache context. When
             omitted it is built from *path* — the recursive scanner passes a
             single context so a ``find_package`` in a sub-directory sees the
             ``option()`` defaults declared in the root ``CMakeLists.txt``.
@@ -2094,10 +2209,14 @@ def scan_directory(
     if cmake_ctx is None and (path / "CMakeLists.txt").is_file():
         cmake_ctx = build_cmake_context(path, extra_cache=cmake_extra_cache)
 
+    # Without a root the directory itself is the root.
+    tree_root = root if root is not None else path.resolve()
     for filename, (scanner_key, _) in _SCANNERS.items():
         filepath = path / filename
-        if filepath.is_file():
+        if filepath.is_file() and _readable(filepath, tree_root):
             logger.info("Detected %s", filepath)
+            if read_files is not None:
+                read_files.append(filepath)
             if scanner_key == "cmake":
                 all_deps.extend(_read_with(
                     "cmake", filename, scan_cmake, filepath, cmake_ctx=cmake_ctx,
@@ -2114,8 +2233,10 @@ def scan_directory(
     # MSBuild project files are named after the project — matched by suffix.
     for suffix in _MSBUILD_PROJECT_SUFFIXES:
         for project_file in sorted(path.glob(f"*{suffix}")):
-            if project_file.is_file():
+            if project_file.is_file() and _readable(project_file, tree_root):
                 logger.info("Detected %s", project_file)
+                if read_files is not None:
+                    read_files.append(project_file)
                 all_deps.extend(_read_with(
                     "msbuild_project", f"*{suffix}", scan_msbuild_project, project_file,
                 ))
@@ -2131,6 +2252,11 @@ def scan_directory(
         xci_files = sorted(path.glob("*.xci"))
         tcl_files = sorted(path.glob("*.tcl"))
         cxf_files = sorted(path.glob("*.cxf"))
+    # The same gate as for lockfiles: inside the tree, regular, not oversized.
+    hwh_files = [f for f in hwh_files if _readable(f, tree_root)]
+    xci_files = [f for f in xci_files if _readable(f, tree_root)]
+    tcl_files = [f for f in tcl_files if _readable(f, tree_root)]
+    cxf_files = [f for f in cxf_files if _readable(f, tree_root)]
     for hwh_file in hwh_files:
         logger.info("Detected %s", hwh_file)
         all_deps.extend(_read_with("vivado_hwh", "*.hwh", scan_vivado_hwh, hwh_file))
@@ -2273,9 +2399,7 @@ def prefer_locked(deps: list[Dependency]) -> list[Dependency]:
 
 #: Directory names whose contents are test/example material — the
 #: components inside are real and stay listed, but scope "excluded"
-#: keeps them out of the traffic light (order collector-
-#: mehrfachversionen Befund 10; libwebsockets added test-apps/,
-#: minimal-examples*/ and contrib/ — Befund 46).
+#: keeps them out of the traffic light.
 _TEST_SCOPE_DIRS = frozenset({
     "tests", "test", "test-apps", "examples", "example",
     "minimal-examples", "fixtures", "samples", "benchmarks", "docs",
@@ -2284,7 +2408,7 @@ _TEST_SCOPE_DIRS = frozenset({
 
 
 def is_test_material_part(part: str) -> bool:
-    """True when a path segment marks test/example/contrib material (Befund 46).
+    """True when a path segment marks test/example/contrib material.
 
     Matches the exact names plus the common families — ``test-*`` (test-apps,
     test-server) and anything with ``example`` in it (minimal-examples-lowlevel).
@@ -2298,6 +2422,7 @@ def is_test_material_part(part: str) -> bool:
 def scan_directory_recursive(
     path: Path, *, max_depth: int = 5, cmake_extra_cache: Path | None = None,
     target_envs: list[TargetEnv] | None = None,
+    read_files: list[Path] | None = None,
 ) -> list[Dependency]:
     """Recursively scan a directory tree for dependency files.
 
@@ -2323,7 +2448,7 @@ def scan_directory_recursive(
     ignore_patterns = load_ignore_patterns(path)
     # One CMake context for the whole tree: option() defaults live in the root
     # CMakeLists.txt, a find_package deep in src/; a configured build's
-    # CMakeCache.txt (in build/, _build/, …) is the source of truth (Befund 41).
+    # CMakeCache.txt (in build/, _build/, …) is the source of truth.
     cmake_ctx = build_cmake_context(path, extra_cache=cmake_extra_cache)
 
     def _walk(current: Path, depth: int) -> None:
@@ -2340,12 +2465,12 @@ def scan_directory_recursive(
 
         # Scan this directory (FPGA sweep off — this walk visits every dir)
         found = scan_directory(
-            current, fpga_recursive=False, cmake_ctx=cmake_ctx,
-            target_envs=target_envs,
+            current, fpga_recursive=False, cmake_ctx=cmake_ctx, root=tree_root,
+            target_envs=target_envs, read_files=read_files,
         )
         # Test/example material travels, but marked: scope "excluded"
         # keeps it out of the traffic light while hiding nothing
-        # (order collector-mehrfachversionen Befund 10, way (b) — a
+        # — a
         # vulnerable flask 0.12.2 from tests/fixtures/ must never gate
         # the product verdict, and must never be silently dropped
         # either). Declarations keep their author's word untouched.
@@ -2370,6 +2495,10 @@ def scan_directory_recursive(
         for entry in entries:
             if not entry.is_dir():
                 continue
+            # A linked directory that resolves outside the tree is not
+            # entered (the walk is the default since block 8).
+            if not _inside_root(entry, tree_root):
+                continue
             # Skip hidden dirs, build-output dirs, VCS dirs, and ignores
             name = entry.name
             if name.startswith(".") or name in DEFAULT_EXCLUDE_DIRS:
@@ -2383,6 +2512,7 @@ def scan_directory_recursive(
                 continue
             _walk(entry, depth + 1)
 
+    tree_root = path.resolve()
     _walk(path, 0)
 
     # Manifest floors lose against resolved versions across the whole tree,

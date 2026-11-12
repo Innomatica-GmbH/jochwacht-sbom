@@ -51,7 +51,7 @@ class TestPackagesLockJson:
         assert log4net.version == "3.0.3" and log4net.ecosystem == "nuget"
         assert log4net.purl == "pkg:nuget/log4net@3.0.3"
         assert log4net.dependencies == ["System.Configuration.ConfigurationManager"]
-        # contentHash is the base64 SHA-512 of the .nupkg — carried as hex (Befund 97)
+        # contentHash is the base64 SHA-512 of the .nupkg — carried as hex
         expected = base64.b64decode(entries["log4net"]["contentHash"]).hex()
         assert log4net.hash_sha512 == expected and len(expected) == 128
         assert all(d.hash_sha512 and len(d.hash_sha512) == 128 for d in deps)

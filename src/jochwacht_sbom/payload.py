@@ -41,6 +41,15 @@ class CheckComponent(BaseModel):
     license: str = ""
     purl: str = ""
     cpe: str = ""
+    #: The purl the reader found, for the LOCAL bill only. ``exclude=True``
+    #: like the fields below: the payload of ``--send`` carries names and
+    #: versions, never a purl of a discovered component (``purl`` above is
+    #: the customer's own declaration). The local file needs it, or it is
+    #: of little use to a vulnerability tool.
+    local_purl: str = Field(default="", exclude=True)
+    #: What the source declared instead of a version (``branch:main`` for a
+    #: west project on a branch, a range for a NuGet floor). Local bill only.
+    declared_range: str = Field(default="", exclude=True)
     #: CycloneDX scope — "excluded" marks test/example material and dev
     #: tooling: listed, but never gating.
     scope: str = ""
@@ -73,7 +82,14 @@ class CheckStats(BaseModel):
     ecosystems: list[str] = Field(default_factory=list)
     #: Human-readable build-output sources (file NAMES only, never paths).
     build_output_sources: list[str] = Field(default_factory=list)
-    #: Number of conditional ALTERNATIVES carried in the payload (Befund 44) —
+    #: Names not counted as components because they are the project itself
+    #: (exact, in the ecosystem of the declaring file). Local only: shown to
+    #: the customer, never sent.
+    own_project_entries: list[str] = Field(default_factory=list, exclude=True)
+    #: File NAMES skipped for their size (over core.file_limit),
+    #: each once. Local only: shown to the customer, never sent.
+    oversized_files: list[str] = Field(default_factory=list, exclude=True)
+    #: Number of conditional ALTERNATIVES carried in the payload —
     #: not part of the component count, surfaced so the report can prompt the
     #: customer to pick a backend / configure the build.
     conditional: int = 0
@@ -86,7 +102,6 @@ class CheckStats(BaseModel):
     #: superseded) instead of the linked set (``go list -deps``) — no Go
     #: toolchain / no buildable package on the customer's machine. The server
     #: records the note so a go.sum-only bill is not read as the built set
-    #: (CRA, Ivan 30.10.2026).
     go_versions_unresolved: bool = False
 
 

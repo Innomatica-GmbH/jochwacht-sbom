@@ -77,16 +77,18 @@ class TestTheFilesTheCustomerWrites:
     ) -> None:
         # Befund 75: both tools must agree on what "self" is, or the
         # self-reference filter drops different packages on each side.
-        from jochwacht_sbom.collector import _project_name
+        from jochwacht_sbom.collector import _own_identities
 
         (tmp_path / written).write_text(
             "project:\n  name: meine-firmware\n", encoding="utf-8",
         )
-        assert _project_name(tmp_path) == "meine-firmware"
+        assert ("meine-firmware", "") in _own_identities(tmp_path)
 
-    def test_without_a_config_the_directory_name_is_the_identity(
+    def test_without_a_declaration_there_is_no_identity(
         self, tmp_path: Path,
     ) -> None:
-        from jochwacht_sbom.collector import _project_name
+        # Since 11.11.2026 never the directory name (sbom/project_identity.py,
+        # the same rule in the suite): a folder "zephyr" lost its zephyr module.
+        from jochwacht_sbom.collector import _own_identities
 
-        assert _project_name(tmp_path) == tmp_path.name
+        assert _own_identities(tmp_path) == frozenset()

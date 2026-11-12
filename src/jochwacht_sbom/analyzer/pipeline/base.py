@@ -53,3 +53,9 @@ class ScanResult(BaseModel):
     dependencies: list[BuildFileDependency] = []
     artifacts: list[BuildFileArtifact] = []
     internal_deps: list[BuildFileInternalDep] = []
+    #: Ökosysteme, für die DIESES Ergebnis vollständig ist und andere Tiers
+    #: verdrängt: go list -deps liefert die gelinkte
+    #: Go-Menge; tier4 gomod (go.mod-require, auch nicht importierte) darf sie
+    #: dann nicht wieder auffüllen. Der Merge streicht Deps dieser Ökosysteme,
+    #: die NICHT aus einem autoritativen Ergebnis stammen.
+    authoritative_for: list[str] = []

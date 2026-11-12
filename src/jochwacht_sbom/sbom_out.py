@@ -1,7 +1,7 @@
 """CycloneDX output (1.6 by default, 1.7 on request) — the customer's own
 result, written locally.
 
-Order collector-transparent-machen (Ivan, 09.09.2026): the default run
+the default run
 GENERATES, SHOWS and SAVES; it uploads nothing. What it saves must be a real
 SBOM the customer can use with any other tool — not our upload payload. So
 this writer emits CycloneDX JSON from the same components the check
@@ -10,10 +10,10 @@ collected, with the honest markings the suite uses:
 - ``scope`` travels ("excluded" = test material / build tooling — listed,
   never gating),
 - a conditional alternative behind an off-by-default build option is
-  ``scope: optional`` with its guard as a property (Befund 44: marked, never
+  ``scope: optional`` with its guard as a property (marked, never
   silently counted as present),
 - ``metadata.lifecycles`` states whether this was read from a configured
-  build or from declarations only (Befund 41).
+  build or from declarations only.
 
 No network, no upload, no telemetry: this function only formats what is
 already on the customer's disk.
@@ -29,6 +29,7 @@ from typing import TYPE_CHECKING
 from jochwacht_sbom import __version__, properties
 from jochwacht_sbom.core.exceptions import JochwachtError
 from jochwacht_sbom.licenses import cyclonedx_licenses
+from jochwacht_sbom.sbom.scanner import _make_purl
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -51,13 +52,46 @@ SPEC_VERSIONS: tuple[str, ...] = ("1.6", "1.7")
 SPEC_VERSION = "1.6"
 
 
+def _purl(comp: CheckComponent) -> str:
+    """The purl of the local bill: the declared one, else the one the reader
+    found, else built the way the suite builds it (same ``_make_purl``)."""
+    if comp.purl or comp.local_purl:
+        return comp.purl or comp.local_purl
+    if not comp.name:
+        return ""
+    return _make_purl(comp.ecosystem, comp.name, comp.version)
+
+
+def _bom_ref(comp: CheckComponent) -> str:
+    """The suite's rule: purl, else name@version, else name."""
+    purl = _purl(comp)
+    if purl:
+        return purl
+    return f"{comp.name}@{comp.version}" if comp.version else comp.name
+
+
+def _components_with_refs(components: list[CheckComponent]) -> list[dict[str, object]]:
+    """Components with unique ``bom-ref`` values; a repeat gets ``#n``."""
+    out: list[dict[str, object]] = []
+    seen: dict[str, int] = {}
+    for comp in components:
+        entry = _component(comp)
+        ref = _bom_ref(comp)
+        n = seen.get(ref, 0)
+        seen[ref] = n + 1
+        entry["bom-ref"] = ref if n == 0 else f"{ref}#{n + 1}"
+        out.append(entry)
+    return out
+
+
 def _component(comp: CheckComponent) -> dict[str, object]:
     """One CycloneDX component entry from a collected component."""
     out: dict[str, object] = {"type": "library", "name": comp.name}
     if comp.version:
         out["version"] = comp.version
-    if comp.purl:
-        out["purl"] = comp.purl
+    purl = _purl(comp)
+    if purl:
+        out["purl"] = purl
     if comp.cpe:
         out["cpe"] = comp.cpe
     if comp.supplier:
@@ -70,7 +104,7 @@ def _component(comp: CheckComponent) -> dict[str, object]:
         if licenses:
             out["licenses"] = licenses
     # A conditional alternative is OPTIONAL, never required: no default build
-    # contains it, and mutually exclusive ones never both ship (Befund 44).
+    # contains it, and mutually exclusive ones never both ship.
     if comp.condition:
         out["scope"] = "optional"
     elif comp.scope in ("required", "optional", "excluded"):
@@ -83,6 +117,9 @@ def _component(comp: CheckComponent) -> dict[str, object]:
         props.append({"name": properties.name("ecosystem"), "value": comp.ecosystem})
     if comp.source_type:
         props.append({"name": properties.name("detected-by"), "value": comp.source_type})
+    if comp.declared_range:
+        # Same property as the suite: what stood where a version belongs.
+        props.append({"name": properties.name("declared-range"), "value": comp.declared_range})
     # Environment markers: local only. These fields are excluded from the
     # payload on purpose (see payload.CheckComponent) — they belong in the
     # customer's own bill, where they explain why a resolution of their own
@@ -139,7 +176,7 @@ def build_cyclonedx(
         "metadata": {
             "timestamp": datetime.now(tz=UTC).isoformat(timespec="seconds"),
             # What this bill was read FROM: "build" = a configured build /
-            # resolved output, "design" = declarations only (Befund 41).
+            # resolved output, "design" = declarations only.
             "lifecycles": [{"phase": lifecycle}],
             "tools": {
                 "components": [{
@@ -155,7 +192,7 @@ def build_cyclonedx(
                 "version": "unspecified",
             },
         },
-        "components": [_component(c) for c in components],
+        "components": _components_with_refs(components),
     }
 
 
@@ -204,7 +241,7 @@ def write_cyclonedx(
 
     This tool's own earlier output at *path* is UPDATED (the stamp in
     ``metadata.tools`` identifies it) — a second run refreshes the bill
-    instead of leaving ``sbom.cdx-2.json`` behind (Ivan, 11.09.2026: a
+    instead of leaving ``sbom.cdx-2.json`` behind (a
     wandering file name is a graveyard and breaks CI). A file that was not
     written by this tool is never touched: that is someone's evidence, and
     the caller must choose another name (``--sbom``).

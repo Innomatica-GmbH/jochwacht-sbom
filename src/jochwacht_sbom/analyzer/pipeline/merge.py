@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-from jochwacht_sbom.analyzer.normalize import normalize_dep_name
+from jochwacht_sbom.analyzer.normalize import LINK_NAME_PACKAGES, normalize_dep_name
 
 if TYPE_CHECKING:
     from jochwacht_sbom.analyzer.models import (
@@ -69,6 +69,59 @@ def _skip_checker() -> Callable[[str], bool] | None:
     return is_skipped
 
 
+def _name_preference(name: str) -> tuple[int, int, str, str]:
+    """Between different names of one library, the one that leads to its key
+    in the knowledge base (measured with the signed knowledge base:
+    libnl-3.0 has a CPE, nl-3 none): lib<key> first (libwebsockets,
+    libevent), then the key itself (openssl, glib, zlib), then a lib name
+    (libnl-3.0 before nl-3), then the shortest, then the spelling."""
+    key = normalize_dep_name(name)
+    low = name.lower()
+    order = 0 if low == f"lib{key}" else 1 if low == key else 2 if low.startswith("lib") else 3
+    return (order, len(name), low, name)
+
+
+# A major version in the name: SDL2, Qt5, Qt5Core, python3 (appended) or
+# usb-1.0, libusb-0.1, gtk+-3.0, glib-2.0 (the pkg-config API suffix).
+_DASH_MAJOR = re.compile(r"-(\d+)(?:\.\d+)*\Z")
+_APPENDED_MAJOR = re.compile(r"\A[A-Za-z+]+?(\d+)(?=[A-Z_]|\Z)")
+
+
+def _major(name: str) -> tuple[int | None, bool]:
+    """(major, appended): the major version a name carries, and whether it
+    is appended to the name itself (SDL2) rather than a pkg-config suffix."""
+    m = _DASH_MAJOR.search(name)
+    if m:
+        return int(m.group(1)), False
+    m = _APPENDED_MAJOR.match(name)
+    if m:
+        return int(m.group(1)), True
+    return None, False
+
+
+def _same_library(a: str, b: str) -> bool:
+    """Two names of one normalized key name one library unless they carry
+    different major versions (SDL and SDL2, Qt5 and Qt6,
+    libusb-0.1 and usb-1.0 are different libraries). A name without a major
+    joins a pkg-config suffix (glib, glib-2.0), never an appended major
+    (SDL is SDL 1, not SDL2)."""
+    (ma, appended_a), (mb, appended_b) = _major(a), _major(b)
+    if ma is not None and mb is not None:
+        return ma == mb
+    if ma is None and mb is None:
+        return True
+    return not (appended_a or appended_b)
+
+
+def _rank(tier: int, dep: BuildFileDependency) -> tuple[int, tuple[int, int, str, str]]:
+    """Which occurrence of a name represents it — lower wins.
+
+    Lowest tier first, then _name_preference. Before, the first won, and the
+    order changed with the hash seed.
+    """
+    return (tier, _name_preference(dep.name))
+
+
 def merge_results(
     results: list[ScanResult],
 ) -> tuple[list[BuildFileDependency], list[BuildFileArtifact], list[BuildFileInternalDep]]:
@@ -90,7 +143,7 @@ def merge_results(
     is_skipped = _skip_checker()
 
     # First pass: collect Tier 1-4 deps
-    dep_best: dict[str, tuple[int, BuildFileDependency]] = {}
+    groups: dict[str, list[list[tuple[int, BuildFileDependency]]]] = {}
 
     for result in results:
         if result.tier >= 5:
@@ -103,9 +156,23 @@ def merge_results(
             ):
                 continue
             key = normalize_dep_name(dep.name)
-            existing = dep_best.get(key)
-            if existing is None or result.tier < existing[0]:
-                dep_best[key] = (result.tier, dep)
+            libraries = groups.setdefault(key, [])
+            for library in libraries:
+                if all(_same_library(dep.name, other.name) for _, other in library):
+                    library.append((result.tier, dep))
+                    break
+            else:
+                libraries.append([(result.tier, dep)])
+
+    dep_best: dict[tuple[str, int], tuple[int, BuildFileDependency]] = {}
+    for key, libraries in groups.items():
+        for index, library in enumerate(libraries):
+            tier, best = min(library, key=lambda entry: _rank(*entry))
+            canonical = LINK_NAME_PACKAGES.get(best.name.lower())
+            if canonical:
+                # -lssl/-lcrypto: the package, the name that has the key
+                best = best.model_copy(update={"name": canonical})
+            dep_best[(key, index)] = (tier, best)
 
     # Second pass: Tier 5 — only keep non-noise deps not already found
     for result in results:
@@ -121,8 +188,9 @@ def merge_results(
             ):
                 continue
             key = normalize_dep_name(dep.name)
-            if key not in dep_best:
-                dep_best[key] = (result.tier, dep)
+            if key not in groups:
+                groups[key] = []
+                dep_best[(key, 0)] = (result.tier, dep)
 
     merged_deps = [dep for _, dep in sorted(dep_best.values(), key=lambda x: x[1].name.lower())]
 

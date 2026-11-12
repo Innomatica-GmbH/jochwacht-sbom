@@ -8,11 +8,11 @@ from __future__ import annotations
 
 import json
 import tomllib
-import xml.etree.ElementTree as ET
 from typing import TYPE_CHECKING
 
 from jochwacht_sbom.analyzer.models import BuildFileDependency
 from jochwacht_sbom.analyzer.pipeline.base import ScanResult
+from jochwacht_sbom.core import xmlsafe
 from jochwacht_sbom.core.log import get_logger
 
 if TYPE_CHECKING:
@@ -457,7 +457,7 @@ class PomXmlParser:
             return ScanResult(tier=self.tier, scanner_name=self.name)
 
         try:
-            tree = ET.parse(file_path)  # noqa: S314
+            tree = xmlsafe.parse(file_path)   # no DOCTYPE, no entities
         except Exception:  # noqa: BLE001
             return ScanResult(tier=self.tier, scanner_name=self.name)
 

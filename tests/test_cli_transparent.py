@@ -1,6 +1,6 @@
-"""0.8.4 — the collector shows first, then sends (order collector-transparent-machen).
+"""0.8.4 — the collector shows first, then sends.
 
-Ivan, 09.09.2026: the DEFAULT run generates, shows and SAVES a real CycloneDX
+The DEFAULT run generates, shows and SAVES a real CycloneDX
 SBOM and transmits nothing; sending is an explicit decision (--send, or the
 question after the summary), needs only an e-mail address (the mandatory code
 was dropped), and shows exactly what leaves the house before the POST.
@@ -20,6 +20,10 @@ from unittest.mock import patch
 from click.testing import CliRunner
 
 from jochwacht_sbom.cli import main
+
+_ENV = {"JOCHWACHT_API_KEY": "jw_test_" + "k" * 24}  # a stand-in, never a real key
+_ANSWER = {"status": "new", "product": "prd_1", "version": 5, "components": 1,
+           "status_href": "/api/v1/products/prd_1/sbom-versions/5/status"}
 
 
 def _project(tmp_path: Path) -> Path:
@@ -41,7 +45,7 @@ class TestDefaultNeverUploads:
         self, tmp_path: Path,
     ) -> None:
         proj = _project(tmp_path)
-        with patch("jochwacht_sbom.cli.upload_payload") as up:
+        with patch("jochwacht_sbom.api.Client.upload") as up:
             res = CliRunner().invoke(main, [str(proj)])
         assert res.exit_code == 0, res.output
         up.assert_not_called()                      # nothing transmitted
@@ -59,7 +63,7 @@ class TestDefaultNeverUploads:
         # In CI (no TTY) the tool must not block on a question — it prints the
         # invitation and exits.
         proj = _project(tmp_path)
-        with patch("jochwacht_sbom.cli.upload_payload") as up:
+        with patch("jochwacht_sbom.api.Client.upload") as up:
             res = CliRunner().invoke(main, [str(proj)])
         assert res.exit_code == 0
         up.assert_not_called()
@@ -73,54 +77,50 @@ class TestSendConfirmsBeforePost:
         self, tmp_path: Path,
     ) -> None:
         proj = _project(tmp_path)
-        with patch("jochwacht_sbom.cli.upload_payload") as up:
+        with patch("jochwacht_sbom.api.Client.upload") as up, \
+             patch("jochwacht_sbom.cli._stdin_is_terminal", return_value=True):
             res = CliRunner().invoke(
-                main, [str(proj), "--send", "--email", "a@b.de"], input="n\n",
+                main, [str(proj), "--send"], input="n\n", env=_ENV,
             )
         assert res.exit_code == 0, res.output
         up.assert_not_called()
         assert "This would be sent" in res.output   # summary shown FIRST
-        assert "OpenSSL" in res.output              # names + versions
+        assert "sbom.cdx.json" in res.output        # the file, exactly as written
         assert "Nothing was sent" in res.output
 
     def test_confirming_posts_once(self, tmp_path: Path) -> None:
         proj = _project(tmp_path)
-        with patch("jochwacht_sbom.cli.upload_payload", return_value="REF-1") as up:
+        with patch("jochwacht_sbom.api.Client.upload", return_value=_ANSWER) as up, \
+             patch("jochwacht_sbom.cli._stdin_is_terminal", return_value=True):
             res = CliRunner().invoke(
-                main, [str(proj), "--send", "--email", "a@b.de"], input="y\n",
+                main, [str(proj), "--send"], input="y\n", env=_ENV,
             )
         assert res.exit_code == 0, res.output
         assert up.call_count == 1
-        assert "REF-1" in res.output
+        assert "version 5" in res.output
 
     def test_yes_skips_the_question(self, tmp_path: Path) -> None:
         proj = _project(tmp_path)
-        with patch("jochwacht_sbom.cli.upload_payload", return_value="REF-2") as up:
-            res = CliRunner().invoke(
-                main, [str(proj), "--send", "--yes", "--email", "a@b.de"],
-            )
+        with patch("jochwacht_sbom.api.Client.upload", return_value=_ANSWER) as up:
+            res = CliRunner().invoke(main, [str(proj), "--send", "--yes"], env=_ENV)
         assert res.exit_code == 0, res.output
         assert up.call_count == 1
 
-    def test_send_needs_only_email_no_code(self, tmp_path: Path) -> None:
-        # send_needs_only_email (Ivan 09.09.): the mandatory code is gone.
+    def test_send_sends_the_written_sbom(self, tmp_path: Path) -> None:
+        # 12.11.2026: what leaves the house is the SBOM file as written.
         proj = _project(tmp_path)
-        with patch("jochwacht_sbom.cli.upload_payload", return_value="R") as up:
-            res = CliRunner().invoke(
-                main, [str(proj), "--send", "--yes", "--email", "a@b.de"],
-            )
+        with patch("jochwacht_sbom.api.Client.upload", return_value=_ANSWER) as up:
+            res = CliRunner().invoke(main, [str(proj), "--send", "--yes"], env=_ENV)
         assert res.exit_code == 0, res.output
-        assert up.call_count == 1
-        payload = up.call_args[0][0]
-        assert payload.contact_email == "a@b.de"
-        assert "code is required" not in res.output
+        assert up.call_args[0][0] == (proj / "sbom.cdx.json").read_bytes()
 
-    def test_send_without_email_fails_before_scanning(
+    def test_send_without_key_fails_before_scanning(
         self, tmp_path: Path,
     ) -> None:
         proj = _project(tmp_path)
-        with patch("jochwacht_sbom.cli.upload_payload") as up:
-            res = CliRunner().invoke(main, [str(proj), "--send"])
+        with patch("jochwacht_sbom.api.Client.upload") as up:
+            res = CliRunner().invoke(main, [str(proj), "--send"],
+                                     env={"JOCHWACHT_API_KEY": ""})
         assert res.exit_code == 1
         up.assert_not_called()
         assert not (proj / "sbom.cdx.json").exists()  # failed before the work
@@ -152,12 +152,12 @@ class TestExistingSbomNotOverwritten:
 
 
 class TestNoSend:
-    """no_send_never_asks (Ivan, 09.09.): for anyone who has decided they
+    """no_send_never_asks: for anyone who has decided they
     will not send — never ask, never transmit, just write the SBOM."""
 
     def test_no_send_never_asks_and_writes(self, tmp_path: Path) -> None:
         proj = _project(tmp_path)
-        with patch("jochwacht_sbom.cli.upload_payload") as up, \
+        with patch("jochwacht_sbom.api.Client.upload") as up, \
              patch("sys.stdin.isatty", return_value=True), \
              patch("sys.stdout.isatty", return_value=True):
             res = CliRunner().invoke(main, [str(proj), "--no-send"])
@@ -168,10 +168,8 @@ class TestNoSend:
 
     def test_no_send_with_send_is_a_contradiction(self, tmp_path: Path) -> None:
         proj = _project(tmp_path)
-        with patch("jochwacht_sbom.cli.upload_payload") as up:
-            res = CliRunner().invoke(
-                main, [str(proj), "--no-send", "--send", "--email", "a@b.de"],
-            )
+        with patch("jochwacht_sbom.api.Client.upload") as up:
+            res = CliRunner().invoke(main, [str(proj), "--no-send", "--send"], env=_ENV)
         assert res.exit_code == 1
         up.assert_not_called()
         assert "contradict" in res.output

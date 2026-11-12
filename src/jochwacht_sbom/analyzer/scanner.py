@@ -31,6 +31,9 @@ BUILD_FILE_PATTERNS: list[tuple[str, str]] = [
     ("Makefile", "make"),
     ("**/Makefile", "make"),
     ("*.mk", "make"),
+    # automake input: fw_LDADD = -lz (measured 12.11.2026: never read)
+    ("Makefile.am", "make"),
+    ("**/Makefile.am", "make"),
     ("meson.build", "meson"),
     ("**/meson.build", "meson"),
     ("conanfile.py", "conan"),
@@ -80,6 +83,7 @@ def collect_build_files(
     Returns:
         List of (file_path, file_type) tuples.
     """
+    from jochwacht_sbom.core.file_limit import note_skipped, too_large
     from jochwacht_sbom.sbom.scanner import (
         DEFAULT_EXCLUDE_DIRS,
         _is_ignored,
@@ -94,7 +98,7 @@ def collect_build_files(
 
     # A directory holding CMakeCache.txt is a CONFIGURED BUILD TREE: its
     # CMakeLists/*.cmake are generated (CMakeFiles/, cmake_install.cmake, …)
-    # and would inject dozens of phantom find_package hits (Befund 41). The
+    # and would inject dozens of phantom find_package hits. The
     # cache itself is read separately as the source of truth; the tree is not
     # a dependency source. Skip everything beneath such a directory.
     build_trees = {
@@ -107,12 +111,27 @@ def collect_build_files(
         rp = p.resolve()
         return any(bt == rp or bt in rp.parents for bt in build_trees)
 
+    tree_root = path.resolve()
     for pattern, file_type in BUILD_FILE_PATTERNS:
         for match in path.glob(pattern):
             if not match.is_file():
                 continue
+            # Not a file that is a link out of the scanned tree, nor one
+            # reached through a linked directory outside it.
+            try:
+                if not match.resolve().is_relative_to(tree_root):
+                    continue
+            except OSError:
+                continue
 
             if build_trees and _in_build_tree(match):
+                continue
+
+            # The one size limit: no tier ever sees a file
+            # over it — tier2_structured read seven 65 MiB manifests whole
+            # and took five components from them. Named, never silent.
+            if too_large(match):
+                note_skipped(match)         # named once, counted by the collector
                 continue
 
             # A Find<Name>.cmake module SEARCHES for a dependency — it is

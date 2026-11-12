@@ -39,26 +39,23 @@ def _project(tmp_path: Path) -> Path:
 class TestNoPlaceholderVoucher:
     """93a — ein leeres Feld ist die Wahrheit: es wurde kein Code angegeben."""
 
-    def test_a_real_send_carries_no_placeholder(self, tmp_path: Path) -> None:
+    def test_the_written_payload_carries_no_placeholder(self, tmp_path: Path) -> None:
+        # The payload is no longer sent (--send sends the SBOM since
+        # 12.11.2026); it is still written with --output.
         proj = _project(tmp_path)
-        with patch("jochwacht_sbom.cli.upload_payload", return_value="R") as up:
-            res = CliRunner().invoke(
-                main, [str(proj), "--send", "--yes", "--email", "a@b.de"],
-            )
+        out = tmp_path / "payload.json"
+        res = CliRunner().invoke(main, [str(proj), "--output", str(out)])
         assert res.exit_code == 0, res.output
-        payload = up.call_args[0][0]
-        assert payload.voucher == "", payload.voucher
-        assert "DRY-RUN" not in payload.voucher
+        payload = json.loads(out.read_text(encoding="utf-8"))
+        assert payload["voucher"] == "", payload["voucher"]
 
-    def test_a_real_voucher_still_travels(self, tmp_path: Path) -> None:
+    def test_a_voucher_still_reaches_the_written_payload(self, tmp_path: Path) -> None:
         proj = _project(tmp_path)
-        with patch("jochwacht_sbom.cli.upload_payload", return_value="R") as up:
-            res = CliRunner().invoke(main, [
-                str(proj), "--send", "--yes", "--email", "a@b.de",
-                "--voucher", "STOIL-2026",
-            ])
+        out = tmp_path / "payload.json"
+        res = CliRunner().invoke(main, [str(proj), "--output", str(out),
+                                        "--voucher", "PARTNER-2026"])
         assert res.exit_code == 0, res.output
-        assert up.call_args[0][0].voucher == "STOIL-2026"
+        assert json.loads(out.read_text(encoding="utf-8"))["voucher"] == "PARTNER-2026"
 
     def test_the_dry_run_output_carries_no_placeholder_either(
         self, tmp_path: Path,
@@ -88,16 +85,12 @@ class TestEveryComponentCarriesAScope:
         # Abnahme des Auftrags: das Testmaterial ist in der Einsendung
         # ausgewiesen, damit der Bericht es trennen kann.
         proj = _project(tmp_path)
-        with patch("jochwacht_sbom.cli.upload_payload", return_value="R") as up:
-            res = CliRunner().invoke(
-                main, [str(proj), "--send", "--yes", "--email", "a@b.de"],
-            )
+        out = tmp_path / "payload.json"
+        res = CliRunner().invoke(main, [str(proj), "--output", str(out)])
         assert res.exit_code == 0, res.output
-        comps = up.call_args[0][0].components
+        comps = json.loads(out.read_text(encoding="utf-8"))["components"]
         assert comps
-        assert all(getattr(c, "scope", "") for c in comps), [
-            (c.name, getattr(c, "scope", "")) for c in comps
-        ]
+        assert all(c.get("scope") for c in comps), [(c["name"], c.get("scope")) for c in comps]
 
     def test_the_written_sbom_separates_product_from_test_material(
         self, tmp_path: Path,
@@ -152,13 +145,13 @@ class TestNoComponentLeavesWithoutAScope:
         return p
 
     def _components(self, tmp_path: Path) -> list:
+        from jochwacht_sbom.payload import CheckPayload
+
         proj = self._three_paths(tmp_path)
-        with patch("jochwacht_sbom.cli.upload_payload", return_value="R") as up:
-            res = CliRunner().invoke(
-                main, [str(proj), "--send", "--yes", "--email", "a@b.de"],
-            )
+        out = tmp_path / "payload.json"
+        res = CliRunner().invoke(main, [str(proj), "--output", str(out)])
         assert res.exit_code == 0, res.output
-        return list(up.call_args[0][0].components)
+        return list(CheckPayload.model_validate_json(out.read_text(encoding="utf-8")).components)
 
     def test_a_tier4_regex_hit_without_condition_becomes_optional(
         self, tmp_path: Path,
