@@ -207,17 +207,24 @@ def stated_image_manifests(manifests: list[Path]) -> tuple[list[Path], list[str]
 
 
 def scan_build_output(
-    path: Path, *, max_depth: int = 5,
+    path: Path, *, max_depth: int = 5, warnings: list[str] | None = None,
 ) -> tuple[list[Dependency], list[str]]:
     """Find and parse Yocto/Buildroot build output under ``path``.
+
+    Args:
+        warnings: Receives the notes on stated-image manifests (folder and
+            image names). Local only — never in the returned sources, which a
+            collector's payload carries (decision b, sicherheit-2 MS1).
 
     Returns:
         (dependencies, human-readable source descriptions)
     """
     found_manifests, legal_dirs = find_build_output(path, max_depth=max_depth)
     manifests, notes = stated_image_manifests(found_manifests)
+    if warnings is not None:
+        warnings.extend(notes)
     deps: list[Dependency] = []
-    sources: list[str] = list(notes)
+    sources: list[str] = []
     for mf in manifests:
         try:
             found = parse_yocto_manifest_file(mf)

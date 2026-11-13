@@ -142,3 +142,19 @@ def test_an_unparsable_files_info_does_not_end_the_reading(tmp_path: Path) -> No
     assert not [f for f in diagnosis.failures() if f.reader == "yocto_build"]
     assert any(c.name == "libc6" for c in components)
     assert any("FILES_INFO not readable" in w for w in stats.build_warnings)
+
+
+def test_shared_scan_build_output_keeps_notes_out_of_the_sources(tmp_path: Path) -> None:
+    """sicherheit-2 MS1: the shared copy of scan_build_output (unused by the
+    collector, which has its own _scan_build_output) puts the notes into
+    warnings= only, like the suite."""
+    from jochwacht_sbom.sbom.buildoutput import scan_build_output
+
+    root = _yocto(tmp_path)
+    folder = root / IMAGES
+    (folder / f"{STAMP}.manifest").rename(folder / "other-image-qemux86-64.rootfs.manifest")
+    (folder / "core-image-minimal-qemux86-64.rootfs.manifest").unlink()
+    warnings: list[str] = []
+    _, sources = scan_build_output(root, warnings=warnings)
+    assert any("stated image's manifest" in w for w in warnings)
+    assert not any("stated image" in s or "qemux86-64" in s for s in sources)
