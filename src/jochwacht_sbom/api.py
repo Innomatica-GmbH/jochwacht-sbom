@@ -50,6 +50,9 @@ _KEY_FORM = re.compile(r"[\x21-\x7e]+")
 #: Not allowed in a product name: control and format characters (invisible ones
 #: like U+200B or U+202E among them), line and paragraph separators, surrogates.
 _NAME_FORBIDDEN = frozenset({"Cc", "Cf", "Zl", "Zp", "Cs"})
+#: Longest product name the API takes (contract §7.1, product_name_invalid).
+_PRODUCT_NAME_MAX = 200
+
 #: How many reachable products a "product_required" answer names at most.
 _PRODUCTS_SHOWN = 10
 _HREF_PREFIX = "/api/v1/"
@@ -98,6 +101,10 @@ def check_product(product: str) -> str:
         msg = ("The product name holds a line break, a control or an invisible character; "
                "copy the name from the portal again.")
         raise ApiError(msg)
+    if len(name) > _PRODUCT_NAME_MAX:
+        msg = (f"The product name is longer than {_PRODUCT_NAME_MAX} characters; "
+               "copy the name from the portal again.")
+        raise ApiError(msg)
     return name
 
 
@@ -108,9 +115,16 @@ def _clean(text: object) -> str:
 
 def _upload_refusal(code: str, raw: bytes) -> str:
     """Our own sentence for the codes of the keys per company; "" for any other code."""
+    if code == "api_key_missing":
+        return f"No API key was sent. Set {KEY_ENV} (never on the command line)."
     if code == "api_key_invalid":
         return (f"The API key is unknown or blocked. Create a key in the portal and set "
                 f"{KEY_ENV}.")
+    if code == "product_inactive":
+        return "This product is not active. Check it in the portal."
+    if code == "product_name_invalid":
+        return (f"The product name is longer than {_PRODUCT_NAME_MAX} characters. "
+                "Copy the name from the portal again.")
     if code == "api_key_scope":
         return ("This API key is limited to other products. Use a key for this product, "
                 "or extend the key in the portal.")
@@ -136,6 +150,20 @@ def _upload_refusal(code: str, raw: bytes) -> str:
             listed += f" and {len(names) - _PRODUCTS_SHOWN} more"
         return (f"Your key reaches several products. Name one with --product or "
                 f"{PRODUCT_ENV}" + (f": {listed}." if listed else "."))
+    return ""
+
+
+def _status_refusal(code: str) -> str:
+    """Our own sentence for the status codes of §16.3; "" for any other code."""
+    if code == "not_found":
+        return ("Nothing to show for this key: the product is unknown, belongs to another "
+                "company or lies outside the key's products, the key is unknown or blocked, "
+                "or this version was not sent with this key or has been replaced.")
+    if code == "product_required":
+        return (f"Your key reaches several products. Name one with --product or "
+                f"{PRODUCT_ENV}.")
+    if code == "premium_required":
+        return "The preliminary result (--preliminary) is part of Premium."
     return ""
 
 
@@ -265,14 +293,14 @@ class Client:
 
     def line_of(self, body: dict[str, Any], status: int) -> str:
         """The ready line of the body (§16.3); without one the error code and
-        sentence — the key removed in every case."""
+        our sentence for it (or the server's) — the key removed in every case."""
         line = body.get("line")
         if isinstance(line, str) and line:
             return _redact(line, self._key)
         raw_err = body.get("error")
         err: dict[str, Any] = raw_err if isinstance(raw_err, dict) else {}
         code = str(err.get("code") or "")
-        sentence = str(err.get("message") or "")
+        sentence = _status_refusal(code) or _clean(err.get("message") or "")
         return _redact(f"Jochwacht answered HTTP {status} {code}: {sentence}".strip(), self._key)
 
 

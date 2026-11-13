@@ -647,3 +647,38 @@ def test_end_to_end_a_name_with_umlauts_arrives_as_utf8(https_server: Any,
     monkeypatch.setenv("SSL_CERT_FILE", str(cert))
     Client(api.api_base(base), KEY).upload(b"{}", product="Steuergerät Süd")
     assert seen[0]["product"] == "Steuergerät Süd"
+
+
+# --- Contract of 27, docs/portal-api-contract.md §7.1 and §16.3 (pakete 176dcaba) -----
+
+@pytest.mark.parametrize(("status", "code", "words"), [
+    (401, "api_key_missing", "JOCHWACHT_API_KEY"),
+    (403, "product_inactive", "product is not active"),
+    (422, "product_name_invalid", "200 characters"),
+])
+def test_the_contract_codes_of_the_upload_get_a_clear_sentence(
+    status: int, code: str, words: str,
+) -> None:
+    text = _refused(status, {"code": code, "message": "server sentence"})
+    assert f"HTTP {status} {code}" in text and words in text and KEY not in text
+
+
+def test_a_product_name_over_200_characters_is_refused_before_the_request() -> None:
+    with pytest.raises(ApiError, match="200 characters"):
+        api.check_product("x" * 201)
+    assert api.check_product("x" * 200) == "x" * 200
+
+
+@pytest.mark.parametrize(("status", "code", "words"), [
+    (404, "not_found", "this key"),
+    (409, "product_required", "--product"),
+    (403, "premium_required", "Premium"),
+])
+def test_the_status_codes_get_a_clear_sentence_and_exit_2(
+    status: int, code: str, words: str,
+) -> None:
+    body = {"error": {"code": code, "status": status, "message": "fixed sentence"}}
+    opener = FakeOpener([(status, body, {})])
+    result, _ = _wait(opener, preliminary=(code == "premium_required"))
+    assert result.exit_code == 2
+    assert words in result.line and code in result.line and KEY not in result.line
