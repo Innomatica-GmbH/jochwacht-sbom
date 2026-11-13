@@ -569,6 +569,13 @@ def yocto_product(build_dir: Path) -> tuple[str, str]:
     return (name, version) if name else ("", "")
 
 
+def _printable(text: str) -> str:
+    """*text* with every non-printable character escaped (names from the
+    build are foreign input)."""
+    return "".join(c if c.isprintable() else c.encode("unicode_escape").decode("ascii")
+                   for c in text)
+
+
 class ManifestUnreadableError(ValueError):
     """An image manifest exists but cannot be read."""
 
@@ -598,18 +605,31 @@ def yocto_recipe_packages(build_dir: Path) -> dict[str, set[str]]:
 
 
 def _manifest_paths(tmp: Path) -> list[Path]:
-    """The image manifests: IMAGE_NAME.manifest of every stated image, else
-    every regular ``*.manifest`` in the deploy image folders."""
-    paths: list[Path] = []
-    for image in _stated_images(tmp):
-        path = _regular(image.folder, f"{image.data['IMAGE_NAME']}.manifest")
-        if path is not None:
+    """The image manifests: IMAGE_NAME.manifest of every stated image; only
+    without any stated image every regular ``*.manifest`` in the deploy image
+    folders.
+
+    Raises:
+        ManifestUnreadableError: a stated image's own manifest is missing (or
+            leaves the build) — the scope of delivery is then unknown, never
+            read from another image's manifest (coordination 13.11.2026,
+            after sicherheit-2: an excluded package leaves the checks).
+    """
+    images = _stated_images(tmp)
+    if images:
+        paths: list[Path] = []
+        for image in images:
+            name = f"{image.data['IMAGE_NAME']}.manifest"
+            path = _regular(image.folder, name)
+            if path is None or not within(path, tmp):
+                raise ManifestUnreadableError(
+                    f"{_printable(name)}: the stated image's manifest is missing")
             paths.append(path)
-    if not paths:
-        folder = tmp / "deploy" / "images"
-        paths = sorted(p for p in folder.glob("*/*.manifest")
-                       if p.is_file() and not p.is_symlink()) if folder.is_dir() else []
-    return [p for p in paths if within(p, tmp)]
+        return paths
+    folder = tmp / "deploy" / "images"
+    found = sorted(p for p in folder.glob("*/*.manifest")
+                   if p.is_file() and not p.is_symlink()) if folder.is_dir() else []
+    return [p for p in found if within(p, tmp)]
 
 
 def yocto_manifest_entries(build_dir: Path) -> list[tuple[str, str]]:
@@ -641,9 +661,10 @@ def yocto_image_packages(build_dir: Path) -> tuple[set[str], list[str]] | None:
 
     The manifest ``IMAGE_NAME.manifest`` of every image a testdata.json
     states (lines ``name arch version``, written by the image recipe of the
-    same build). Without a stated image, every ``*.manifest`` in the deploy
-    image folders; ``None`` when there is none (nothing proven, nothing
-    excluded).
+    same build); a stated image without it raises
+    :class:`ManifestUnreadableError` (scope unknown). Without a stated
+    image, every ``*.manifest`` in the deploy image folders; ``None`` when
+    there is none (nothing proven, nothing excluded).
     """
     tmp = _tmp_dir(build_dir) or (build_dir if (build_dir / "deploy").is_dir() else None)
     if tmp is None:
