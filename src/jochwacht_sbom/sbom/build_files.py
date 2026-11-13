@@ -651,31 +651,49 @@ class BuildrootPackage:
     host_reason: str                   # "" | "bom-ref host-<name>" | "BR_TYPE=host"
 
 
-def _sbom_candidates(build_dir: Path) -> list[Path]:
-    """Where Buildroot's CycloneDX SBOM may lie, in order; only regular files
-    inside *build_dir*, links resolved (no path out of what was handed in)."""
+def _sbom_candidates(build_dir: Path) -> tuple[list[Path], list[Path]]:
+    """Where Buildroot's CycloneDX SBOM may lie, in order: (inside, refused).
+
+    Only regular files inside *build_dir*, links resolved (no path out of
+    what was handed in); a candidate pointing outside is returned apart so
+    the caller can name it (nothing dropped silently).
+    """
     candidates = [
         build_dir / "output" / "legal-info" / "buildroot.cdx.json",
         build_dir / "legal-info" / "buildroot.cdx.json",
         *sorted(build_dir.glob("output/legal-info/*.cdx.json")),
         *sorted(build_dir.glob("**/*.cdx.json")),
     ]
-    return [p for p in dict.fromkeys(candidates) if p.is_file() and _within(p, build_dir)]
+    found = [p for p in dict.fromkeys(candidates) if p.is_file()]
+    return ([p for p in found if _within(p, build_dir)],
+            [p for p in found if not _within(p, build_dir)])
 
 
 def _buildroot_sbom(build_dir: Path) -> tuple[Path | None, dict[str, object] | None, str]:
     """(path, document, warning): the first candidate that is CycloneDX. An
-    unreadable candidate ends the search with a warning, as in suite-b's import."""
+    unreadable candidate ends the search with a warning, as in suite-b's import;
+    a candidate refused for pointing outside is named in the warning."""
     import json
 
-    for path in _sbom_candidates(build_dir):
+    inside, refused = _sbom_candidates(build_dir)
+    named = "; ".join(f"{_rel(p, build_dir)} points outside the build directory; not read"
+                      for p in refused)
+    for path in inside:
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except (ValueError, OSError) as exc:
             return None, None, f"Failed to parse {path}: {exc}"
         if isinstance(data, dict) and data.get("bomFormat") == "CycloneDX":
-            return path, data, ""
-    return None, None, ""
+            return path, data, named
+    return None, None, named
+
+
+def _rel(path: Path, root: Path) -> str:
+    """*path* relative to *root* as written, without resolving links."""
+    try:
+        return path.relative_to(root).as_posix()
+    except ValueError:
+        return path.as_posix()
 
 
 def buildroot_sbom_file(build_dir: Path) -> Path | None:
@@ -746,9 +764,9 @@ def buildroot_packages(build_dir: Path) -> tuple[list[BuildrootPackage], list[st
     Nothing drops silently: a component without name and a patch without a
     valid CycloneDX type are counted in a warning.
     """
-    path, data, failed = _buildroot_sbom(build_dir)
+    path, data, note = _buildroot_sbom(build_dir)
     if path is None or data is None:
-        return [], [failed] if failed else []
+        return [], [note] if note else []
     packages: list[BuildrootPackage] = []
     nameless = dropped_patches = 0
     components = data.get("components")
@@ -761,7 +779,7 @@ def buildroot_packages(build_dir: Path) -> tuple[list[BuildrootPackage], list[st
             continue
         dropped_patches += dropped
         packages.append(pkg)
-    warnings: list[str] = []
+    warnings: list[str] = [note] if note else []
     if nameless:
         warnings.append(f"{nameless} component(s) without name in {path.name} "
                         "were not imported.")
