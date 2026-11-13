@@ -223,6 +223,12 @@ def build_cyclonedx(
             f"Use one of {', '.join(SPEC_VERSIONS)}."
         )
     lifecycle = stats.lifecycle or "design"
+    name, version = project_name, "unspecified"
+    if full and stats.build_product:
+        # The product the one build names, as the suite writes it; the upload
+        # keeps its header (no new field leaves the house).
+        name = stats.build_product[0]
+        version = stats.build_product[1] or version
     return {
         "bomFormat": "CycloneDX",
         "specVersion": spec_version,
@@ -243,8 +249,8 @@ def build_cyclonedx(
             },
             "component": {
                 "type": "application",
-                "name": project_name,
-                "version": "unspecified",
+                "name": name,
+                "version": version,
             },
         },
         "components": _components_with_refs(

@@ -166,6 +166,7 @@ def _reader_warnings(into: list[str]) -> Iterator[None]:
 
 def _buildroot_build_components(
     path: Path, record_failure: Any, warnings: list[str], read_roots: list[Path],
+    products: list[tuple[str, str]],
 ) -> list[CheckComponent]:
     """The packages and images of every Buildroot build under *path*.
 
@@ -191,6 +192,7 @@ def _buildroot_build_components(
                     builds.append(build)
                     read_roots.append(root.resolve())
                     warnings.extend(build.warnings)
+                    products.append((build.product_name, build.product_version))
     except Exception as exc:  # noqa: BLE001 — a reader defect, recorded, not fatal
         record_failure("buildroot_build", "legal-info/buildroot.cdx.json", exc)
         read_roots.clear()
@@ -237,6 +239,7 @@ def _buildroot_build_components(
 
 def _yocto_build_components(
     path: Path, record_failure: Any, warnings: list[str], read_roots: list[Path],
+    products: list[tuple[str, str]],
 ) -> list[CheckComponent]:
     """The packages and images of every Yocto build under *path*.
 
@@ -261,6 +264,7 @@ def _yocto_build_components(
         build = read.build
         read_roots.append(read.tmp_dir.resolve())
         warnings.extend(build.warnings)
+        products.append((build.product_name, build.product_version))
         for (raw_name, raw_version), entry in zip(read.packages, build.entries, strict=True):
             name, version = clean(raw_name), clean(raw_version)
             out.append(CheckComponent(
@@ -622,12 +626,13 @@ def collect_components(
     # packages replace the legal-info/manifest.csv rows of the same build.
     build_warnings: list[str] = []
     replaced_roots: list[Path] = []
+    products: list[tuple[str, str]] = []
     build_comps = _buildroot_build_components(path, record_failure, build_warnings,
-                                              replaced_roots)
+                                              replaced_roots, products)
     # Path 3b: a Yocto BUILD DIRECTORY (bitbake TMPDIR, 0.20, suite-d): its
     # packages replace the *.rootfs.manifest rows of the same build.
     yocto_comps = _yocto_build_components(path, record_failure, build_warnings,
-                                          replaced_roots)
+                                          replaced_roots, products)
 
     # Path 3: Yocto/Buildroot BUILD OUTPUT — what is actually in the
     # customer's image (run the check in the build directory).
@@ -715,6 +720,12 @@ def collect_components(
         lifecycle=lifecycle,
         go_versions_unresolved=go_versions_unresolved,
         oversized_files=file_limit.skipped_names(),
+        # One build that names its product: that is the product (as the suite
+        # writes it); of several builds, none is "the" product.
+        build_product=(
+            [strip_control_chars(products[0][0]), strip_control_chars(products[0][1])]
+            if len(products) == 1 and strip_control_chars(products[0][0]) else []
+        ),
         build_warnings=list(dict.fromkeys(strip_control_chars(w) for w in build_warnings)),
         buildroot_source_skipped=[
             Path(os.path.relpath(src, path.resolve())).as_posix() for src in br_sources

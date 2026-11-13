@@ -124,3 +124,25 @@ def test_sy1_a_rootfs_over_the_limit_is_said(scanned: Path, monkeypatch: Any) ->
     assert any("rootfs not read" in w for w in stats.build_warnings), stats.build_warnings
     sent = json.dumps(stats.model_dump())
     assert "build_warnings" not in sent  # local only, never uploaded
+
+
+def test_the_local_bill_names_the_product_the_build_states(scanned: Path) -> None:
+    """suite-d's parity finding: the suite writes the image recipe
+    (IMAGE_BASENAME, PV of testdata.json) as metadata.component; the collector
+    wrote the folder name and 'unspecified'. The upload keeps its header."""
+    from jochwacht_sbom.yocto_build import read_yocto_builds
+
+    (read,) = read_yocto_builds(scanned)
+    components, stats = collect_components(scanned)
+    meta = build_cyclonedx(components, stats, project_name="project")["metadata"]["component"]
+    assert (meta["name"], meta["version"]) == (
+        read.build.product_name, read.build.product_version) == ("core-image-minimal", "1.0")
+    sent = json.loads(slim_bytes(components, stats, project_name="project"))
+    assert sent["metadata"]["component"]["name"] == "project"
+
+
+def test_two_builds_name_no_product(scanned: Path, tmp_path: Path) -> None:
+    shutil.copytree(EXCERPT, scanned / "zweiter", symlinks=True)
+    components, stats = collect_components(scanned)
+    meta = build_cyclonedx(components, stats, project_name="project")["metadata"]["component"]
+    assert (meta["name"], meta["version"]) == ("project", "unspecified")

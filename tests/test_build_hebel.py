@@ -281,3 +281,10 @@ def test_sb1_a_second_tree_keeps_its_manifest_rows(tmp_path: Path) -> None:
     assert "zweitbaum-only" in names
     assert names.count("busybox") == 1
     assert any("replaced by the build" in s for s in stats.build_output_sources)
+
+
+def test_the_local_bill_names_the_buildroot_product(tmp_path: Path) -> None:
+    meta = _doc(_tree(tmp_path))["metadata"]["component"]
+    assert (meta["name"], meta["version"]) == ("buildroot", "2025.08.2")
+    sent = json.loads(slim_bytes(*collect_components(tmp_path), project_name="fw"))
+    assert sent["metadata"]["component"]["name"] == "fw"

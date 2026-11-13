@@ -111,6 +111,11 @@ class CheckStats(BaseModel):
     #: rootfs over the reading limit, hard links, files without a package,
     #: unreadable feeds). Local only: shown, never sent (sicherheit-2 SY1).
     build_warnings: list[str] = Field(default_factory=list, exclude=True)
+    #: (name, version) of the product when exactly one build directory was
+    #: read and names it (Buildroot's metadata.component, Yocto's image
+    #: recipe): the local bill's metadata.component, as the suite writes it.
+    #: Local only: the upload keeps its header (suite-d's parity finding).
+    build_product: list[str] = Field(default_factory=list, exclude=True)
     #: Number of conditional ALTERNATIVES carried in the payload —
     #: not part of the component count, surfaced so the report can prompt the
     #: customer to pick a backend / configure the build.
