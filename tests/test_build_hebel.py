@@ -318,3 +318,67 @@ def test_a_buildroot_part_linked_outside_is_named_never_read(tmp_path: Path, rel
     assert any(expected in w for w in stats.build_warnings), stats.build_warnings
     res = CliRunner().invoke(main, [str(root)])
     assert expected in " ".join(res.output.split()), res.output
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="symbolic links need privileges on Windows")
+@pytest.mark.parametrize("rel", ["output/target", "output/images", "output/build"])
+def test_a_root_of_the_buildroot_reader_linked_outside_is_named_never_read(
+    tmp_path: Path, rel: str,
+) -> None:
+    """sicherheit-2 on 5b30a9b (Y1 in the Buildroot core): with output/target,
+    output/images or output/build a link out of the build, the core hashed
+    files that lie only outside (bin/aussen, zImage). suite-c's core fix
+    (Suite build-files 3f6d9bd) reads nothing there and names it."""
+    import os
+
+    from click.testing import CliRunner
+
+    from jochwacht_sbom.cli import main
+
+    root = _tree(tmp_path / "proj")
+    out = root / "output"
+    (out / "build" / "packages-file-list.txt").write_text(
+        "busybox,./bin/busybox\nbusybox,./etc/inittab\nbusybox,./bin/aussen\n",
+        encoding="utf-8")
+    (out / "images").mkdir()
+    (out / "images" / "zImage").write_bytes(ELF)
+    inside = root / rel
+    outside = tmp_path / "elsewhere" / Path(rel).name
+    outside.parent.mkdir()
+    shutil.move(str(inside), str(outside))
+    if rel == "output/target":
+        (outside / "bin" / "aussen").write_bytes(ELF + b"outside")
+    os.symlink(outside, inside)
+    components, stats = collect_components(root)
+    hashed = [f.path for c in components for f in c.delivered_files]
+    # nothing from outside: no file of target/ when target/ is the link, no
+    # file at all without the file list, no image from images/
+    assert "bin/aussen" not in hashed
+    if rel != "output/images":
+        assert hashed == [], hashed
+    assert not any(c.delivered_image is not None for c in components)
+    part = {"output/target": "target", "output/images": "images",
+            "output/build": "build/packages-file-list.txt"}[rel]
+    expected = f"{part} points outside the build directory; not read"
+    assert any(expected in w and w.startswith("Buildroot build at ")
+               for w in stats.build_warnings), stats.build_warnings
+    res = CliRunner().invoke(main, [str(root)])
+    assert res.exit_code == 0, res.output
+    assert expected in " ".join(res.output.split())
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="symbolic links need privileges on Windows")
+def test_an_image_file_linked_outside_is_counted_never_hashed(tmp_path: Path) -> None:
+    """A single file in output/images that links out (sicherheit-2 on
+    build-files): not hashed, and the customer reads how many."""
+    import os
+
+    root = _tree(tmp_path / "proj")
+    images = root / "output" / "images"
+    images.mkdir()
+    (tmp_path / "zImage").write_bytes(ELF)
+    os.symlink(tmp_path / "zImage", images / "zImage")
+    components, stats = collect_components(root)
+    assert not any(c.delivered_image is not None for c in components)
+    assert any("1 file(s) in output/images point outside the build directory" in w
+               for w in stats.build_warnings), stats.build_warnings

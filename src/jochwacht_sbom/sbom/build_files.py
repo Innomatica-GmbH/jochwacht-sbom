@@ -216,6 +216,32 @@ def _buildroot_output(build_dir: Path) -> Path:
     return nested if (nested / "build").is_dir() else build_dir
 
 
+def _outside(path: Path, build_dir: Path) -> bool:
+    """*path* exists but lies, links resolved, outside *build_dir* (Y1)."""
+    return (path.exists() or path.is_symlink()) and not _within(path, build_dir)
+
+
+def buildroot_roots_outside(build_dir: Path) -> list[str]:
+    """The roots of a Buildroot build that point outside the build folder,
+    as written (relative to *build_dir*); none of them is read (Y1, found by
+    suite-c in suite-d's Yocto reader and then here, 13.11.2026)."""
+    out = _buildroot_output(build_dir)
+    candidates = [out, out / "build" / "packages-file-list.txt", out / "target",
+                  out / "images", out / ".config", build_dir / ".config"]
+    found: list[str] = []
+    for path in candidates:
+        if path != build_dir and _outside(path, build_dir):
+            rel = _rel(path, build_dir)
+            if rel not in found:
+                found.append(rel)
+    return found
+
+
+def outside_warning(rel: str) -> str:
+    """The warning for a root that is not read because it points outside."""
+    return f"{rel} points outside the build directory; not read"
+
+
 def buildroot_evidence(
     build_dir: Path, *, counts: dict[str, int] | None = None,
 ) -> dict[str, ComponentEvidence]:
@@ -233,6 +259,9 @@ def buildroot_evidence(
     target = out / "target"
     if not listing.is_file() or not target.is_dir():
         return {}
+    if not (_within(out, build_dir) and _within(listing, build_dir)
+            and _within(target, build_dir)):
+        return {}  # named by buildroot_roots_outside (Y1)
     claims: dict[str, set[str]] = {}
     packages: dict[str, list[str]] = {}
     for line in listing.read_text(encoding="utf-8", errors="replace").splitlines():
@@ -353,7 +382,7 @@ def _image_names(config: dict[str, str]) -> dict[str, str]:
 
 
 def buildroot_image_evidence(
-    build_dir: Path,
+    build_dir: Path, *, counts: dict[str, int] | None = None,
 ) -> tuple[dict[str, list[FileFacts]], list[FileFacts]]:
     """images/ files assigned to linux and uboot by name rule; the rest apart.
 
@@ -364,24 +393,35 @@ def buildroot_image_evidence(
     images = out / "images"
     if not images.is_dir():
         return {}, []
+    if not (_within(out, build_dir) and _within(images, build_dir)):
+        return {}, []  # named by buildroot_roots_outside (Y1)
     # O= build: output/.config; in-tree build: .config beside output/
     config_path = out / ".config"
     if not config_path.is_file() and out != build_dir:
         config_path = build_dir / ".config"
-    names = _image_names(_read_config(config_path))
+    # A .config from outside assigns nothing (Y1): the images stay unassigned.
+    names = (_image_names(_read_config(config_path))
+             if not _outside(config_path, build_dir) else {})
     per_package: dict[str, list[FileFacts]] = {}
     rest: list[FileFacts] = []
+    links_outside = 0
     for path in sorted(images.rglob("*")):
         rel = path.relative_to(images).as_posix()
         try:
             facts = file_facts(images, rel, mode_bits=False)
         except (ValueError, OSError):
-            continue  # a symlink, a directory or gone
+            # A symlink, a directory or gone. A link that leads out of
+            # images/ is counted, not dropped silently (sicherheit-2).
+            if path.is_symlink() and not within(path, images):
+                links_outside += 1
+            continue
         package = names.get(rel)
         if package:
             per_package.setdefault(package, []).append(facts)
         else:
             rest.append(facts)
+    if counts is not None and links_outside:
+        counts["links_outside"] = links_outside
     return per_package, rest
 
 
@@ -448,6 +488,15 @@ def _source_version(src: Path) -> str:
         return ""
     m = re.search(r"^export BR2_VERSION\s*:=\s*(\S+)", mk.read_text(errors="replace"), re.M)
     return m.group(1) if m else ""
+
+
+def within(path: Path, root: Path) -> bool:
+    """Whether *path*, all symlinks resolved, lies inside *root* (resolved).
+
+    The one check for every root a build reader takes (BE1, Y1); public so
+    the Yocto reader (build_files_yocto) uses the same function.
+    """
+    return _within(path, root)
 
 
 def _within(path: Path, root: Path) -> bool:
@@ -903,7 +952,7 @@ def buildroot_build_evidence(
     if not evidence:
         return None
     sources = [f"{ORIGIN_BUILDROOT_TARGET} (output/target)"]
-    warnings: list[str] = []
+    warnings: list[str] = [outside_warning(r) for r in buildroot_roots_outside(build_dir)]
     if any(left_out.values()):
         warnings.append(
             f"packages-file-list.txt: {left_out['not_regular_or_gone']} listed path(s) "
@@ -911,7 +960,11 @@ def buildroot_build_evidence(
             f"outside); {left_out['shared_paths']} path(s) claimed by two packages, "
             "given to neither")
     image_origin = {"linux": ORIGIN_BUILDROOT_IMAGES_LINUX, "uboot": ORIGIN_BUILDROOT_IMAGES_UBOOT}
-    per_package, rest = buildroot_image_evidence(build_dir)
+    image_counts: dict[str, int] = {}
+    per_package, rest = buildroot_image_evidence(build_dir, counts=image_counts)
+    if image_counts.get("links_outside"):
+        warnings.append(f"{image_counts['links_outside']} file(s) in output/images point "
+                        "outside the build directory; not read")
     delivered_names = [name for name, excluded in entries if not excluded]
     creators, creator_gaps = buildroot_creators(
         build_dir, delivered_names,
@@ -1007,5 +1060,6 @@ def read_buildroot_build(
     return BuildrootBuild(
         product_name=name, product_version=version, packages=builds,
         images=ev.images if ev is not None else [],
-        warnings=warnings + (ev.warnings if ev is not None else []),
+        warnings=warnings + (ev.warnings if ev is not None else
+                             [outside_warning(r) for r in buildroot_roots_outside(build_dir)]),
         sources=sources + (ev.sources if ev is not None else []))
