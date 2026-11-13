@@ -164,9 +164,24 @@ def _reader_warnings(into: list[str]) -> Iterator[None]:
         into.extend(handler.messages)
 
 
+def _buildroot_own_version(root: Path) -> str:
+    """Buildroot's own version from the header of the build's .config ("#
+    Buildroot X Configuration"), "" when there is none inside the build. It is
+    what generate-cyclonedx writes as the product version when the customer
+    gives no --project-version (BR2_VERSION_FULL)."""
+    from jochwacht_sbom.sbom.build_files import _config_version, within
+
+    for cfg in (root / ".config", root / "output" / ".config"):
+        if cfg.is_file() and within(cfg, root):
+            version = _config_version(cfg)
+            if version:
+                return version
+    return ""
+
+
 def _buildroot_build_components(
     path: Path, record_failure: Any, warnings: list[str], read_roots: list[Path],
-    products: list[tuple[str, str]],
+    products: list[tuple[str, str, str, str]],
 ) -> list[CheckComponent]:
     """The packages and images of every Buildroot build under *path*.
 
@@ -193,7 +208,8 @@ def _buildroot_build_components(
                     read_roots.append(root.resolve())
                     where = Path(os.path.relpath(root, path)).as_posix()
                     warnings.extend(f"Buildroot build at {where}: {w}" for w in build.warnings)
-                    products.append((build.product_name, build.product_version))
+                    products.append((build.product_name, build.product_version,
+                                     "buildroot", _buildroot_own_version(root)))
     except Exception as exc:  # noqa: BLE001 — a reader defect, recorded, not fatal
         record_failure("buildroot_build", "legal-info/buildroot.cdx.json", exc)
         read_roots.clear()
@@ -294,7 +310,7 @@ def _build_links_outside(path: Path, *, max_depth: int) -> list[str]:
 
 def _yocto_build_components(
     path: Path, record_failure: Any, warnings: list[str], read_roots: list[Path],
-    products: list[tuple[str, str]],
+    products: list[tuple[str, str, str, str]],
 ) -> list[CheckComponent]:
     """The packages and images of every Yocto build under *path*.
 
@@ -320,7 +336,7 @@ def _yocto_build_components(
         read_roots.append(read.tmp_dir.resolve())
         where = os.path.relpath(read.tmp_dir, path)
         warnings.extend(f"Yocto build at {Path(where).as_posix()}: {w}" for w in build.warnings)
-        products.append((build.product_name, build.product_version))
+        products.append((build.product_name, build.product_version, "yocto", ""))
         for (raw_name, raw_version), entry in zip(read.packages, build.entries, strict=True):
             name, version = clean(raw_name), clean(raw_version)
             out.append(CheckComponent(
@@ -682,7 +698,7 @@ def collect_components(
     # packages replace the legal-info/manifest.csv rows of the same build.
     build_warnings: list[str] = []
     replaced_roots: list[Path] = []
-    products: list[tuple[str, str]] = []
+    products: list[tuple[str, str, str, str]] = []
     build_comps = _buildroot_build_components(path, record_failure, build_warnings,
                                               replaced_roots, products)
     # Path 3b: a Yocto BUILD DIRECTORY (bitbake TMPDIR, 0.20, suite-d): its
@@ -783,6 +799,8 @@ def collect_components(
             [strip_control_chars(products[0][0]), strip_control_chars(products[0][1])]
             if len(products) == 1 and strip_control_chars(products[0][0]) else []
         ),
+        build_product_kind=products[0][2] if len(products) == 1 else "",
+        build_tool_version=strip_control_chars(products[0][3]) if len(products) == 1 else "",
         build_warnings=list(dict.fromkeys(strip_control_chars(w) for w in build_warnings)),
         buildroot_source_skipped=[
             Path(os.path.relpath(src, path.resolve())).as_posix() for src in br_sources

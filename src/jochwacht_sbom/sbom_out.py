@@ -230,11 +230,15 @@ def build_cyclonedx(
     # bill the product version the one build names, as the suite writes it.
     name, version = project_name, release
     if full and stats.build_product:
+        # The local bill keeps what the build states (sicherheit-2 on
+        # 2cfd184); a label that differs stands beside it as a property.
         name = stats.build_product[0]
-        version = release or stats.build_product[1]
+        version = stats.build_product[1] or release
     product: dict[str, object] = {"type": "application", "name": name}
     if version:
         product["version"] = version
+    if release and release != version:
+        product["properties"] = [{"name": "jochwacht:release-label", "value": release}]
     return {
         "bomFormat": "CycloneDX",
         "specVersion": spec_version,

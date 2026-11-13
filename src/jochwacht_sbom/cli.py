@@ -351,17 +351,9 @@ def _run(  # noqa: PLR0913 — mirrors the CLI surface
         )
         sys.exit(1)
     uploading = send and not dry_run and output is None
-    # The release label is checked before anything is read or written: a bad
-    # one would only be refused by the server (contract of 27), and without
-    # one the upload is certain to be refused (release_label_missing).
+    # A stated label is checked before anything is read or written: a bad one
+    # would only be refused by the server (contract of 27).
     label = api.check_release(release)
-    if uploading and not label:
-        console.print(
-            f"[red]Error:[/red] --send needs the release of this version: name it with "
-            f"--release (for example 1.4.2) or {api.RELEASE_ENV}. Nothing was sent.",
-            soft_wrap=True,
-        )
-        sys.exit(1)
     if uploading:
         gone = [flag for flag, value in (("--email", contact_email), ("--voucher", voucher),
                                          ("--code", code), ("--url", url != DEFAULT_SUBMIT_URL))
@@ -414,6 +406,26 @@ def _run(  # noqa: PLR0913 — mirrors the CLI surface
         include_declared_metadata=not no_declared_metadata,
         target_envs=target_envs,
     )
+    if not label:
+        # Without --release: what is proven, never a guess (coordination,
+        # 13.11.2026): the one git tag on HEAD, else the product version the
+        # build states when it is not a tool default. Without one the upload
+        # is certain to be refused (release_label_missing): refused here,
+        # before the copy is written.
+        from jochwacht_sbom.release_label import derive
+
+        derived, source, why = derive(path, stats)
+        if derived:
+            label = api.check_release(derived)
+            console.print(f"Release label {fg(label)} from {source}.", soft_wrap=True)
+        elif uploading:
+            console.print(
+                f"[red]Error:[/red] --send needs the release of this version: name it with "
+                f"--release (for example 1.4.2) or {api.RELEASE_ENV}, or tag the current "
+                f"commit. Looked for: {fg(why)}. Nothing was sent.",
+                soft_wrap=True,
+            )
+            sys.exit(1)
     nicht_geliefert = [c for c in components if c.scope == "excluded" and c.scope_reason]
     if nicht_geliefert:
         console.print(

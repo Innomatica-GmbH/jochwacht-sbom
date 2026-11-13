@@ -125,9 +125,14 @@ jochwacht-sbom status --wait 600                 # 0 green/yellow/waiting for a 
   must exist in the portal; the upload never creates one. A key can be limited
   to some products; another product is then refused.
 - `--send` needs the release of the version you send: `--release` or
-  `JOCHWACHT_RELEASE` (for example your tag), at most 100 characters; a longer
-  one is refused, never shortened. It is written as the version into the bill
-  and the upload. The same label replaces the previous version of that
+  `JOCHWACHT_RELEASE`, at most 100 characters; a longer one is refused, never
+  shortened. Without them the collector takes the git tag exactly on the
+  current commit (several tags there: you name one), else the product version
+  a Buildroot or Yocto build states, when it is yours and not the tool's
+  default (Buildroot's own version, Yocto's PV "1.0"). The output names where
+  the label came from; without any, nothing is sent. The label is the version
+  in the upload; the local bill keeps the version the build states and
+  carries a differing label beside it. The same label replaces the previous version of that
   release; a new label is a new release with a full check. When the releases
   of your subscription are used up, the oldest fully checked one goes into
   watch, and you get a mail.

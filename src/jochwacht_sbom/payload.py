@@ -116,6 +116,11 @@ class CheckStats(BaseModel):
     #: recipe): the local bill's metadata.component, as the suite writes it.
     #: Local only: the upload keeps its header (suite-d's parity finding).
     build_product: list[str] = Field(default_factory=list, exclude=True)
+    #: "buildroot" or "yocto" for build_product, and the build tool's own
+    #: version where it is known (Buildroot's, from .config): together they
+    #: tell a product version the customer chose from a tool default.
+    build_product_kind: str = Field(default="", exclude=True)
+    build_tool_version: str = Field(default="", exclude=True)
     #: Number of conditional ALTERNATIVES carried in the payload —
     #: not part of the component count, surfaced so the report can prompt the
     #: customer to pick a backend / configure the build.
