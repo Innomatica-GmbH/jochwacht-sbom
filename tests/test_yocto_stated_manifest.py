@@ -125,3 +125,20 @@ def test_kirkstone_naming_reads_the_build(tmp_path: Path) -> None:
     assert any(c.name == "libc6" for c in components)
     assert not [f for f in diagnosis.failures() if f.reader == "yocto_build"]
     assert any(c.delivered_files for c in components)  # the rootfs tar was found
+
+
+def test_an_unparsable_files_info_does_not_end_the_reading(tmp_path: Path) -> None:
+    """sicherheit-2 (Y5 pattern): FILES_INFO nested beyond the JSON parser.
+    The Yocto build reading goes on; the package is named, not 'no file'."""
+    root = _yocto(tmp_path)
+    runtime = root / "build/tmp/pkgdata/qemux86-64/runtime/sysvinit-inittab"
+    deep = "[" * 200_000 + "]" * 200_000
+    lines = [f"FILES_INFO:sysvinit-inittab: {deep}"
+             if line.startswith("FILES_INFO:sysvinit-inittab:") else line
+             for line in runtime.read_text(encoding="utf-8").splitlines()]
+    runtime.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    diagnosis.reset()
+    components, stats = collect_components(root)
+    assert not [f for f in diagnosis.failures() if f.reader == "yocto_build"]
+    assert any(c.name == "libc6" for c in components)
+    assert any("FILES_INFO not readable" in w for w in stats.build_warnings)

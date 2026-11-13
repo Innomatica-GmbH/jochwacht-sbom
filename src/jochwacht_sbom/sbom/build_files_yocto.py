@@ -342,6 +342,8 @@ class YoctoImageEvidence:
     hardlinks: list[str] = field(default_factory=list)
     #: why the rootfs was not read at all ("" = read).
     aborted: str = ""
+    #: packages whose pkgdata FILES_INFO could not be parsed (files unknown).
+    unreadable: list[str] = field(default_factory=list)
 
 
 #: Limits of the rootfs tar (a customer upload in the worker): exceeding one
@@ -440,17 +442,27 @@ def _regular(folder: Path, name: str) -> Path | None:
     return path if path.is_file() else None
 
 
-def _owners(tmp: Path, images: list[_Image]) -> dict[str, set[str]]:
-    """rootfs path -> output package names that list it in FILES_INFO."""
+#: Gap reason on a package whose pkgdata FILES_INFO could not be parsed: its
+#: files are not known — not "the build lists no file" (sicherheit-2, Y5).
+REASON_FILE_LIST_UNREADABLE = "file_list_unreadable"
+
+def _owners(tmp: Path, images: list[_Image]) -> tuple[dict[str, set[str]], list[str]]:
+    """rootfs path -> output package names that list it in FILES_INFO.
+
+    A FILES_INFO that cannot be parsed (not JSON, or nested beyond the
+    parser: RecursionError) is not an empty list: the package is returned
+    as unreadable and its files stay unproven."""
     stated = {Path(str(i.data["PKGDATA_DIR"])).name for i in images
               if isinstance(i.data.get("PKGDATA_DIR"), str)}
     owners: dict[str, set[str]] = {}
+    unreadable_names: list[str] = []
     for runtime in _runtime_dirs(tmp, stated):
         for entry in sorted(runtime.iterdir()):
             pkg = entry.name
             if pkg.endswith(".packaged") or entry.is_symlink() or not entry.is_file():
                 continue
-            name, paths = pkg, []
+            name, unreadable = pkg, False
+            paths: list[str] = []
             prefix_pkg, prefix_files = f"PKG:{pkg}: ", f"FILES_INFO:{pkg}: "
             try:
                 lines = entry.read_text(encoding="utf-8", errors="replace").splitlines()
@@ -462,12 +474,19 @@ def _owners(tmp: Path, images: list[_Image]) -> dict[str, set[str]]:
                 elif line.startswith(prefix_files):
                     try:
                         listed = json.loads(line[len(prefix_files):])
-                    except ValueError:
-                        listed = {}
-                    paths = [str(p) for p in listed] if isinstance(listed, dict) else []
+                    except (ValueError, RecursionError):
+                        listed = None
+                    if not isinstance(listed, dict):
+                        unreadable = True
+                        paths = []
+                    else:
+                        paths = [str(p) for p in listed]
+            if unreadable:
+                unreadable_names.append(name)
+                continue
             for path in paths:
                 owners.setdefault(path, set()).add(name)
-    return owners
+    return owners, unreadable_names
 
 
 def _member_path(name: str) -> str | None:
@@ -484,7 +503,7 @@ def _scan(build_dir: Path) -> tuple[dict[str, ComponentEvidence], YoctoImageEvid
     if tmp is None:
         return {}, YoctoImageEvidence()
     images = _stated_images(tmp)
-    owners = _owners(tmp, images)
+    owners, unreadable_lists = _owners(tmp, images)
     per_package: dict[str, list[FileFacts]] = {}
     unowned: list[FileFacts] = []
     image_files: list[FileFacts] = []
@@ -538,7 +557,8 @@ def _scan(build_dir: Path) -> tuple[dict[str, ComponentEvidence], YoctoImageEvid
         evidence = {pkg: ComponentEvidence(pkg, tuple(files), ORIGIN_YOCTO_ROOTFS)
                     for pkg, files in sorted(per_package.items())}
     return evidence, YoctoImageEvidence(kernels, image_files, unowned,
-                                        sorted(set(duplicates)), sorted(set(hardlinks)), aborted)
+                                        sorted(set(duplicates)), sorted(set(hardlinks)), aborted,
+                                        sorted(set(unreadable_lists)))
 
 
 def _read_rootfs(
@@ -966,6 +986,11 @@ def yocto_build(build_dir: Path, names: list[str]) -> YoctoBuildEvidence:
         warnings.append(
             "rootfs files without a package (inside the image archive): "
             f"{len(images.unowned)}, executable among them: {executable}")
+    unreadable_lists = set(images.unreadable)
+    if images.unreadable:
+        warnings.append(f"pkgdata FILES_INFO not readable, files unknown: "
+                        f"{len(images.unreadable)} (" + ", ".join(
+                            _printable(n) for n in images.unreadable[:5]) + ")")
     if images.duplicates:
         warnings.append(
             "rootfs paths that appear more than once in the image tar (no hash "
@@ -986,6 +1011,8 @@ def yocto_build(build_dir: Path, names: list[str]) -> YoctoBuildEvidence:
         if evidence:
             if out:
                 reason = REASON_NOT_DELIVERED
+            elif name in unreadable_lists:
+                reason = REASON_FILE_LIST_UNREADABLE
             else:
                 ev = evidence.get(name) or ComponentEvidence(name, (), ORIGIN_YOCTO_ROOTFS)
                 files, unclassified = component_files(ev)

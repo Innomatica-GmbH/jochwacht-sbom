@@ -731,7 +731,7 @@ def _buildroot_sbom(build_dir: Path) -> tuple[Path | None, dict[str, object] | N
     for path in inside:
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-        except (ValueError, OSError) as exc:
+        except (ValueError, OSError, RecursionError) as exc:
             return None, None, f"Failed to parse {path}: {exc}"
         if isinstance(data, dict) and data.get("bomFormat") == "CycloneDX":
             return path, data, named
