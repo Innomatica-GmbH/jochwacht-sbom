@@ -197,10 +197,11 @@ def _error_text(raw: bytes, status: int, key: str) -> tuple[str, str]:
     except json.JSONDecodeError:
         err = None
     if isinstance(err, dict):
-        code = str(err.get("code") or "")
-        sentence = str(err.get("message") or "")
+        code = _clean(err.get("code") or "")
+        sentence = _clean(err.get("message") or "")
     else:
-        code, sentence = "", raw.decode("utf-8", errors="replace")[:200]
+        code, sentence = "", _clean(raw.decode("utf-8", errors="replace")[:200])
+    # cleaned at the source (sicherheit-2): no escape sequence reaches a log
     return _redact(code, key), _redact(sentence, key)
 
 
@@ -296,10 +297,10 @@ class Client:
         our sentence for it (or the server's) — the key removed in every case."""
         line = body.get("line")
         if isinstance(line, str) and line:
-            return _redact(line, self._key)
+            return _redact(_clean(line), self._key)
         raw_err = body.get("error")
         err: dict[str, Any] = raw_err if isinstance(raw_err, dict) else {}
-        code = str(err.get("code") or "")
+        code = _clean(err.get("code") or "")
         sentence = _status_refusal(code) or _clean(err.get("message") or "")
         return _redact(f"Jochwacht answered HTTP {status} {code}: {sentence}".strip(), self._key)
 

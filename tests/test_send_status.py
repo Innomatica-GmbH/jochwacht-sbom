@@ -682,3 +682,13 @@ def test_the_status_codes_get_a_clear_sentence_and_exit_2(
     result, _ = _wait(opener, preliminary=(code == "premium_required"))
     assert result.exit_code == 2
     assert words in result.line and code in result.line and KEY not in result.line
+
+
+def test_server_text_is_cleaned_at_the_source() -> None:
+    """sicherheit-2 on 6ba235a: an escape sequence in an unknown code's sentence or
+    in a status line never reaches a log, not only the terminal."""
+    text = _refused(422, {"code": "weird_code", "message": "a\x1b]8;;http://x\x07b"})
+    assert "\x1b" not in text and "\x07" not in text
+    body = {"line": "Jochwacht: \x1b[31mred\x1b[0m"}
+    line = Client(BASE, KEY, opener=FakeOpener([])).line_of(body, 200)
+    assert "\x1b" not in line and "red" in line
