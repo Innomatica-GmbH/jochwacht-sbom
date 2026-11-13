@@ -260,3 +260,24 @@ def test_the_summary_names_the_skipped_buildroot_source(tmp_path: Path) -> None:
     assert res.exit_code == 0, res.output
     out = " ".join(res.output.split())
     assert "Buildroot source not scanned (its build is read instead): buildroot" in out
+
+
+def test_sb1_a_second_tree_keeps_its_manifest_rows(tmp_path: Path) -> None:
+    """sicherheit-2 SB1: only the manifest.csv of the read build is replaced
+    (by path); another tree's rows stay, as in 0.19."""
+    _tree(tmp_path / "br")
+    second = tmp_path / "second" / "output" / "legal-info"
+    second.mkdir(parents=True)
+    (second / "manifest.csv").write_text(
+        '"PACKAGE","VERSION","LICENSE","LICENSE FILES","SOURCE ARCHIVE","SOURCE SITE",'
+        '"DEPENDENCIES WITH LICENSES"\n"zweitbaum-only","9.9","MIT","","","",""\n',
+        encoding="utf-8")
+    (tmp_path / "br" / "output" / "legal-info" / "manifest.csv").write_text(
+        '"PACKAGE","VERSION","LICENSE","LICENSE FILES","SOURCE ARCHIVE","SOURCE SITE",'
+        '"DEPENDENCIES WITH LICENSES"\n"busybox","1.37.0","GPL-2.0","","","",""\n',
+        encoding="utf-8")
+    components, stats = collect_components(tmp_path)
+    names = [c.name for c in components]
+    assert "zweitbaum-only" in names
+    assert names.count("busybox") == 1
+    assert any("replaced by the build" in s for s in stats.build_output_sources)

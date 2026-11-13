@@ -81,3 +81,46 @@ def test_a_second_manifest_only_tree_keeps_its_rows(scanned: Path) -> None:
     names = [c.name for c in components if c.ecosystem == "yocto"]
     assert "zlib" in names
     assert names.count("base-files") == 1
+
+
+def _rewrite_rootfs(scanned: Path, extra: list[tuple[str, bytes]]) -> None:
+    import io
+    import tarfile
+
+    path = scanned / "build/tmp/deploy/images/qemux86-64" / f"{IMAGE}.tar.bz2"
+    with tarfile.open(path) as tf:
+        members = [(m, tf.extractfile(m).read() if m.isfile() else None)  # type: ignore[union-attr]
+                   for m in tf.getmembers()]
+    with tarfile.open(path, "w:bz2") as tf:
+        for m, data in members:
+            tf.addfile(m, io.BytesIO(data) if data is not None else None)
+        for name, data in extra:
+            info = tarfile.TarInfo(name)
+            info.size, info.mode = len(data), 0o755
+            tf.addfile(info, io.BytesIO(data))
+
+
+def test_sy1_a_duplicate_rootfs_path_is_said(scanned: Path) -> None:
+    """sicherheit-2 SY1: the reader's warnings reach the customer, not only
+    the suite's import."""
+    from click.testing import CliRunner
+
+    from jochwacht_sbom.cli import main
+
+    _rewrite_rootfs(scanned, [("./bin/start_getty", b"#!/bin/sh\nchanged\n")])
+    _, stats = collect_components(scanned)
+    assert any("appear more than once" in w and "bin/start_getty" in w
+               for w in stats.build_warnings), stats.build_warnings
+    res = CliRunner().invoke(main, [str(scanned)])
+    assert res.exit_code == 0, res.output
+    assert "appear more than once" in " ".join(res.output.split())
+
+
+def test_sy1_a_rootfs_over_the_limit_is_said(scanned: Path, monkeypatch: Any) -> None:
+    from jochwacht_sbom.sbom import build_files_yocto
+
+    monkeypatch.setattr(build_files_yocto, "MAX_ROOTFS_MEMBERS", 1)
+    _, stats = collect_components(scanned)
+    assert any("rootfs not read" in w for w in stats.build_warnings), stats.build_warnings
+    sent = json.dumps(stats.model_dump())
+    assert "build_warnings" not in sent  # local only, never uploaded

@@ -206,6 +206,7 @@ _NOT_A_LICENSE = (
     "none",
     "n/a",
     "nolicense",
+    "noassertion",  # the SPDX placeholder (sicherheit-2 on collector 9bbb255)
 )
 
 

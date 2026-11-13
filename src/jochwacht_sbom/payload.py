@@ -107,6 +107,10 @@ class CheckStats(BaseModel):
     #: the generic scanners did not read: Buildroot's own tooling is not the
     #: product, its build says what is. Local only: shown, never sent.
     buildroot_source_skipped: list[str] = Field(default_factory=list, exclude=True)
+    #: What the build readers could not prove (duplicate rootfs paths, a
+    #: rootfs over the reading limit, hard links, files without a package,
+    #: unreadable feeds). Local only: shown, never sent (sicherheit-2 SY1).
+    build_warnings: list[str] = Field(default_factory=list, exclude=True)
     #: Number of conditional ALTERNATIVES carried in the payload —
     #: not part of the component count, surfaced so the report can prompt the
     #: customer to pick a backend / configure the build.

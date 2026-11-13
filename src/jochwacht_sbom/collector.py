@@ -14,7 +14,10 @@ anywhere, instantly, with zero setup.
 
 from __future__ import annotations
 
+import logging
 import os
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -133,8 +136,36 @@ def _below_any(p: Path, roots: tuple[Path, ...]) -> bool:
     return any(rp == r or r in rp.parents for r in roots)
 
 
+class _ReaderWarnings(logging.Handler):
+    """The shared readers' logger warnings, kept for the customer's summary
+    (sicherheit-2 SY1: in the suite they stand in the import; here they were
+    lost)."""
+
+    def __init__(self) -> None:
+        super().__init__(level=logging.WARNING)
+        self.messages: list[str] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.messages.append(record.getMessage())
+
+
+@contextmanager
+def _reader_warnings(into: list[str]) -> Iterator[None]:
+    handler = _ReaderWarnings()
+    loggers = [logging.getLogger(f"jochwacht_sbom.sbom.{name}")
+               for name in ("build_files", "build_files_yocto")]
+    for log in loggers:
+        log.addHandler(handler)
+    try:
+        yield
+    finally:
+        for log in loggers:
+            log.removeHandler(handler)
+        into.extend(handler.messages)
+
+
 def _buildroot_build_components(
-    path: Path, record_failure: Any,
+    path: Path, record_failure: Any, warnings: list[str], read_roots: list[Path],
 ) -> list[CheckComponent]:
     """The packages and images of every Buildroot build under *path*.
 
@@ -143,18 +174,26 @@ def _buildroot_build_components(
     Nothing here leaves the house: the build evidence sits in fields that are
     excluded from the payload and from the upload.
     """
-    from jochwacht_sbom.buildroot_build import read_buildroot_builds
-    from jochwacht_sbom.sbom.build_files import join_licenses
+    from jochwacht_sbom.buildroot_build import find_buildroot_builds
+    from jochwacht_sbom.sbom.build_files import BuildrootBuild, join_licenses, read_buildroot_build
     from jochwacht_sbom.sbom.licenses import normalize_license
 
     def classify(text: str) -> tuple[str, str] | None:
         value = normalize_license(text)
         return (value.kind, value.value) if value is not None else None
 
+    builds: list[BuildrootBuild] = []
     try:
-        builds = read_buildroot_builds(path)
+        with _reader_warnings(warnings):
+            for root in find_buildroot_builds(path):
+                build = read_buildroot_build(root)
+                if build is not None:
+                    builds.append(build)
+                    read_roots.append(root.resolve())
+                    warnings.extend(build.warnings)
     except Exception as exc:  # noqa: BLE001 — a reader defect, recorded, not fatal
         record_failure("buildroot_build", "legal-info/buildroot.cdx.json", exc)
+        read_roots.clear()
         return []
     from jochwacht_sbom.sbom.classify import _purl_needs_cleaning, strip_control_chars
 
@@ -197,7 +236,7 @@ def _buildroot_build_components(
 
 
 def _yocto_build_components(
-    path: Path, record_failure: Any,
+    path: Path, record_failure: Any, warnings: list[str], read_roots: list[Path],
 ) -> list[CheckComponent]:
     """The packages and images of every Yocto build under *path*.
 
@@ -212,13 +251,16 @@ def _yocto_build_components(
     from jochwacht_sbom.yocto_build import read_yocto_builds
 
     try:
-        reads = read_yocto_builds(path)
+        with _reader_warnings(warnings):
+            reads = read_yocto_builds(path)
     except Exception as exc:  # noqa: BLE001 — a reader defect, recorded, not fatal
         record_failure("yocto_build", "deploy/images/*.manifest", exc)
         return []
     out: list[CheckComponent] = []
     for read in reads:
         build = read.build
+        read_roots.append(read.tmp_dir.resolve())
+        warnings.extend(build.warnings)
         for (raw_name, raw_version), entry in zip(read.packages, build.entries, strict=True):
             name, version = clean(raw_name), clean(raw_version)
             out.append(CheckComponent(
@@ -239,6 +281,59 @@ def _yocto_build_components(
                 confidence=_LOCKFILE_CONFIDENCE, delivered_image=image,
             ))
     return out
+
+
+def _scan_build_output(
+    path: Path, *, max_depth: int, replaced_roots: tuple[Path, ...],
+) -> tuple[list[Any], list[str]]:
+    """sbom.buildoutput.scan_build_output, except that an image manifest or a
+    legal-info/manifest.csv inside a build that was read is replaced by that
+    build: by PATH, so another tree's rows stay (sicherheit-2 SB1; 0.19 had
+    them). The replaced file is still named in the sources."""
+    import csv
+
+    from jochwacht_sbom.sbom.buildoutput import (
+        find_build_output,
+        parse_buildroot_manifest_csv,
+        parse_yocto_manifest_file,
+    )
+
+    root = path.resolve()
+    manifests, legal_dirs = find_build_output(path, max_depth=max_depth)
+    deps: list[Any] = []
+    sources: list[str] = []
+    for mf in manifests:
+        try:
+            found = parse_yocto_manifest_file(mf)
+        except (OSError, UnicodeDecodeError) as exc:
+            sources.append(f"skipped yocto image manifest {mf.name}: {type(exc).__name__}")
+            continue
+        if not found:
+            continue
+        if _below_any(mf, replaced_roots):
+            sources.append(f"yocto image manifest {mf.name} ({len(found)} packages, "
+                           "replaced by the build)")
+            continue
+        deps.extend(found)
+        sources.append(f"yocto image manifest {mf.name} ({len(found)} packages)")
+    for legal in legal_dirs:
+        csv_file = legal / "manifest.csv"
+        if not csv_file.is_file() or not _below_any(csv_file, (root,)):
+            continue
+        try:
+            found = parse_buildroot_manifest_csv(csv_file)
+        except (OSError, UnicodeDecodeError, csv.Error) as exc:
+            sources.append(f"skipped buildroot legal-info manifest.csv: {type(exc).__name__}")
+            continue
+        if not found:
+            continue
+        if _below_any(csv_file, replaced_roots):
+            sources.append(f"buildroot legal-info manifest.csv ({len(found)} packages, "
+                           "replaced by the build)")
+            continue
+        deps.extend(found)
+        sources.append(f"buildroot legal-info manifest.csv ({len(found)} packages)")
+    return deps, sources
 
 
 def collect_components(
@@ -525,38 +620,33 @@ def collect_components(
     # Path 3a: a Buildroot BUILD DIRECTORY (0.20): Buildroot's own SBOM, the
     # delivered files and what they prove, read by the shared core. Its
     # packages replace the legal-info/manifest.csv rows of the same build.
-    build_comps = _buildroot_build_components(path, record_failure)
+    build_warnings: list[str] = []
+    replaced_roots: list[Path] = []
+    build_comps = _buildroot_build_components(path, record_failure, build_warnings,
+                                              replaced_roots)
     # Path 3b: a Yocto BUILD DIRECTORY (bitbake TMPDIR, 0.20, suite-d): its
     # packages replace the *.rootfs.manifest rows of the same build.
-    yocto_comps = _yocto_build_components(path, record_failure)
+    yocto_comps = _yocto_build_components(path, record_failure, build_warnings,
+                                          replaced_roots)
 
     # Path 3: Yocto/Buildroot BUILD OUTPUT — what is actually in the
     # customer's image (run the check in the build directory).
-    from jochwacht_sbom.sbom.buildoutput import scan_build_output
-
     try:
-        build_output_deps, build_output_sources = scan_build_output(
-            path, max_depth=max_depth,
+        build_output_deps, build_output_sources = _scan_build_output(
+            path, max_depth=max_depth, replaced_roots=tuple(replaced_roots),
         )
     except Exception as exc:  # noqa: BLE001 — a reader defect, recorded, not fatal
         record_failure("build_output", "deploy/images/*.manifest | legal-info/manifest.csv", exc)
         build_output_deps, build_output_sources = [], []
-    if build_comps:
-        build_output_deps = [d for d in build_output_deps if d.ecosystem != "buildroot"]
-    if yocto_comps:
-        # Only the rows the read build carries itself (the same manifest
-        # lines): a manifest-only tree elsewhere in the path keeps its rows.
-        read_rows = {(c.name, c.version) for c in yocto_comps if c.delivered_image is None}
-        build_output_deps = [
-            d for d in build_output_deps
-            if d.ecosystem != "yocto"
-            or (strip_control_chars(d.name), strip_control_chars(d.version)) not in read_rows
-        ]
+    # The same package and version from another tree is the same component:
+    # listed once, the build's entry with its evidence wins.
+    from_builds = {(_identity(c.name), c.version)
+                   for c in build_comps + yocto_comps if c.delivered_image is None}
     for dep in build_output_deps:
         clean_dependency(dep)  # control-char hygiene
         # Resolved, installed packages — the skip list never applies.
         key = (_identity(dep.name), dep.version)
-        if key in merged:
+        if key in merged or key in from_builds:
             continue
         merged[key] = CheckComponent(
             name=dep.name,
@@ -625,6 +715,7 @@ def collect_components(
         lifecycle=lifecycle,
         go_versions_unresolved=go_versions_unresolved,
         oversized_files=file_limit.skipped_names(),
+        build_warnings=list(dict.fromkeys(strip_control_chars(w) for w in build_warnings)),
         buildroot_source_skipped=[
             Path(os.path.relpath(src, path.resolve())).as_posix() for src in br_sources
         ],
