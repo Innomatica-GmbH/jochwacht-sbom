@@ -200,20 +200,27 @@ def _buildroot_build_components(
 
     builds: list[BuildrootBuild] = []
     try:
-        with _reader_warnings(warnings):
-            for root in find_buildroot_builds(path):
-                build = read_buildroot_build(root)
-                if build is not None:
-                    builds.append(build)
-                    read_roots.append(root.resolve())
-                    where = Path(os.path.relpath(root, path)).as_posix()
-                    warnings.extend(f"Buildroot build at {where}: {w}" for w in build.warnings)
-                    products.append((build.product_name, build.product_version,
-                                     "buildroot", _buildroot_own_version(root)))
-    except Exception as exc:  # noqa: BLE001 — a reader defect, recorded, not fatal
+        roots = find_buildroot_builds(path)
+    except Exception as exc:  # noqa: BLE001 — a finder defect, recorded, not fatal
         record_failure("buildroot_build", "legal-info/buildroot.cdx.json", exc)
-        read_roots.clear()
         return []
+    for root in roots:
+        # Per build (sicherheit-2 on a308e75): one broken build is recorded
+        # and the healthy ones beside it stay in the bill.
+        try:
+            with _reader_warnings(warnings):
+                build = read_buildroot_build(root)
+                own = _buildroot_own_version(root) if build is not None else ""
+        except Exception as exc:  # noqa: BLE001 — a reader defect, recorded, not fatal
+            record_failure("buildroot_build", "legal-info/buildroot.cdx.json", exc)
+            continue
+        if build is None:
+            continue
+        builds.append(build)
+        read_roots.append(root.resolve())
+        where = Path(os.path.relpath(root, path)).as_posix()
+        warnings.extend(f"Buildroot build at {where}: {w}" for w in build.warnings)
+        products.append((build.product_name, build.product_version, "buildroot", own))
     from jochwacht_sbom.sbom.classify import _purl_needs_cleaning, strip_control_chars
 
     # Buildroot's SBOM is foreign text: control, format and separator

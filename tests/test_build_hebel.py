@@ -383,3 +383,29 @@ def test_an_image_file_linked_outside_is_counted_never_hashed(tmp_path: Path) ->
     assert not any(c.delivered_image is not None for c in components)
     assert any("1 file(s) in output/images point outside the build directory" in w
                for w in stats.build_warnings), stats.build_warnings
+
+
+def test_one_broken_build_does_not_take_the_healthy_one_along(
+    tmp_path: Path, monkeypatch: Any,
+) -> None:
+    """sicherheit-2 on a308e75: a reader failure is recorded per build. Two
+    Buildroot builds under the path, the reading of one fails: the other one
+    stays in the bill, the failure is recorded once (type only, no path)."""
+    from jochwacht_sbom import diagnosis
+    from jochwacht_sbom.sbom import build_files
+
+    _tree(tmp_path / "good")
+    bad = _tree(tmp_path / "bad")
+    real = build_files.read_buildroot_build
+
+    def flaky(root: Path, **kwargs: Any) -> Any:
+        if bad in (root, *root.parents) or root.resolve() == (bad / "output").resolve():
+            raise ValueError("broken build")
+        return real(root, **kwargs)
+
+    monkeypatch.setattr(build_files, "read_buildroot_build", flaky)
+    diagnosis.reset()
+    components, _ = collect_components(tmp_path)
+    assert "busybox" in {c.name for c in components if c.delivered_files}
+    failed = [f for f in diagnosis.failures() if f.reader == "buildroot_build"]
+    assert [f.exc_type for f in failed] == ["ValueError"]
