@@ -63,8 +63,9 @@ _stdout = SafeConsole(soft_wrap=True)
     "--product",
     default=lambda: os.environ.get(api.PRODUCT_ENV, ""),
     show_default="JOCHWACHT_PRODUCT",
-    help="The product the SBOM belongs to (name, reference or id); needed only "
-    "when the subscription has several products.",
+    help="The product the SBOM belongs to: its name as in the portal, or its id "
+    "prd_…; needed only when your key reaches several products. The product must "
+    "exist in the portal: the upload never creates one.",
 )
 @click.option(
     "--no-send",
@@ -676,7 +677,7 @@ def _run(  # noqa: PLR0913 — mirrors the CLI surface
 @click.option("--product", default=lambda: os.environ.get(api.PRODUCT_ENV, ""),
               show_default="JOCHWACHT_PRODUCT",
               help="Without a status address: the product whose current version "
-              "is asked (name, reference or id).")
+              "is asked (its name as in the portal, or its id prd_…).")
 @click.option("--project-dir", type=click.Path(file_okay=False, path_type=Path),
               default=Path("."), show_default=True,
               help="Where .jochwacht/last-upload.json lies (the directory --send ran in).")

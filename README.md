@@ -120,8 +120,10 @@ jochwacht-sbom status --wait 600      # 0 green/yellow/waiting for a person, 1 r
 - The key comes from `JOCHWACHT_API_KEY`, the address from `JOCHWACHT_API_URL`
   (default `https://api.jochwacht.dev`). Only https, no redirect is followed,
   the key is never printed or saved.
-- With several products in the subscription, name one with `--product` or
-  `JOCHWACHT_PRODUCT`.
+- When your key reaches several products, name one with `--product` or
+  `JOCHWACHT_PRODUCT`: its name as in the portal, or its id `prd_…`. The product
+  must exist in the portal; the upload never creates one. A key can be limited
+  to some products; another product is then refused.
 - The answer of the send is kept in `.jochwacht/last-upload.json` (without the
   key). `status` must run in the same directory, or get `--status-href`.
 - `status` asks again while the comparison still runs (`--wait`, seconds) and

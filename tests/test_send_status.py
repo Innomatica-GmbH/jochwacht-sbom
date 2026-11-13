@@ -126,7 +126,7 @@ def test_upload_sends_the_raw_sbom_with_key_and_product() -> None:
     assert req.get_method() == "POST"
     assert req.data == b'{"bomFormat":"CycloneDX"}'
     assert req.get_header("X-api-key") == KEY
-    assert req.get_header("X-product") == "fw"
+    assert req.get_header("X-product") == b"fw"
 
 
 def test_upload_without_product_sends_no_product_header() -> None:
@@ -243,7 +243,7 @@ def test_without_href_the_current_version_route_with_product() -> None:
     _wait(opener, href=None, product="fw")
     [req] = opener.requests
     assert req.full_url == BASE + "/api/v1/subscriptions/sbom-versions/status"
-    assert req.get_header("X-product") == "fw"
+    assert req.get_header("X-product") == b"fw"
 
 
 @pytest.mark.parametrize("href", ["https://evil.example/api/v1/x", "//evil.example/x",
@@ -383,7 +383,11 @@ def https_server(tmp_path: Path):  # type: ignore[no-untyped-def]
 
         def do_POST(self) -> None:
             body = self.rfile.read(int(self.headers["Content-Length"]))
-            seen.append({"path": self.path, "key": self.headers.get("X-Api-Key"), "len": len(body)})
+            raw_product = self.headers.get("X-Product")
+            seen.append({"path": self.path, "key": self.headers.get("X-Api-Key"), "len": len(body),
+                         # http.server reads header bytes as latin-1, like the API does
+                         "product": (raw_product.encode("latin-1").decode("utf-8")
+                                     if raw_product is not None else None)})
             if self.headers.get("X-Product") == "redirect-me":
                 self.send_response(307)
                 self.send_header("Location", "https://evil.example/steal")
@@ -575,3 +579,71 @@ def test_enter_at_the_question_sends_nothing(tmp_path: Path,
     res = CliRunner().invoke(cli.main, [str(_project(tmp_path)), "--send"], input="\n",
                              env={"JOCHWACHT_API_KEY": KEY})
     assert res.exit_code == 0 and called == [] and "Nothing was sent" in res.output
+
+
+# --- keys per company (Ivan, 13.11.2026): the product by its name ------------------
+
+def test_the_product_name_is_trimmed_and_may_hold_umlauts() -> None:
+    opener = FakeOpener([(200, {"status": "new", "status_href": HREF}, {})])
+    Client(BASE, KEY, opener=opener).upload(b"{}", product="  Steuergerät Süd  ")
+    assert opener.requests[0].get_header("X-product") == "Steuergerät Süd".encode()
+
+
+@pytest.mark.parametrize("bad", ["fw\nX-Api-Key: x", "fw\r", "fw\x00", "fw\u202e", "fw\u2028",
+                                 "fw\u200b"])
+def test_a_name_with_a_line_break_or_an_invisible_character_is_refused(bad: str) -> None:
+    opener = FakeOpener([])
+    with pytest.raises(ApiError) as caught:
+        Client(BASE, KEY, opener=opener).upload(b"{}", product=bad)
+    assert "portal" in str(caught.value) and not opener.requests
+
+
+def test_a_blank_product_sends_no_header() -> None:
+    opener = FakeOpener([(200, {"status": "new", "status_href": HREF}, {})])
+    Client(BASE, KEY, opener=opener).upload(b"{}", product="   ")
+    assert opener.requests[0].get_header("X-product") is None
+
+
+def _refused(status: int, error: dict[str, Any]) -> str:
+    opener = FakeOpener([(status, {"error": {"status": status, **error}}, {})])
+    with pytest.raises(ApiError) as caught:
+        Client(BASE, KEY, opener=opener).upload(b"{}", product="fw")
+    return str(caught.value)
+
+
+@pytest.mark.parametrize(("status", "code", "words"), [
+    (403, "api_key_invalid", "unknown or blocked"),
+    (403, "api_key_scope", "limited to other products"),
+    (404, "product_unknown", "Create it in the portal"),
+    (403, "subscription_inactive", "subscription is not active"),
+])
+def test_the_new_codes_get_a_clear_sentence(status: int, code: str, words: str) -> None:
+    text = _refused(status, {"code": code, "message": "server sentence"})
+    assert f"HTTP {status} {code}" in text and words in text and KEY not in text
+
+
+def test_product_required_lists_the_reachable_products() -> None:
+    text = _refused(409, {"code": "product_required", "message": "server sentence",
+                          "products": [{"public_id": "prd_1", "name": "Gateway"},
+                                       {"public_id": "prd_2", "name": "Steuergerät"}]})
+    assert "--product" in text and "JOCHWACHT_PRODUCT" in text
+    assert "Gateway" in text and "Steuergerät" in text
+
+
+def test_product_required_with_a_long_or_hostile_list_stays_short_and_clean() -> None:
+    products = [{"public_id": f"prd_{i}", "name": f"P{i}\x1b[31m"} for i in range(50)]
+    text = _refused(409, {"code": "product_required", "message": "", "products": products})
+    assert "\x1b" not in text and "and 40 more" in text
+
+
+def test_an_unknown_code_keeps_the_servers_sentence() -> None:
+    assert "server sentence" in _refused(422, {"code": "sbom_unreadable",
+                                               "message": "server sentence"})
+
+
+def test_end_to_end_a_name_with_umlauts_arrives_as_utf8(https_server: Any,
+                                                        monkeypatch: pytest.MonkeyPatch) -> None:
+    base, cert, seen = https_server
+    monkeypatch.setenv("SSL_CERT_FILE", str(cert))
+    Client(api.api_base(base), KEY).upload(b"{}", product="Steuergerät Süd")
+    assert seen[0]["product"] == "Steuergerät Süd"

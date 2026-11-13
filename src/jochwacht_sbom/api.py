@@ -20,6 +20,7 @@ import os
 import re
 import ssl
 import time
+import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -42,11 +43,15 @@ LAST_UPLOAD = Path(".jochwacht") / "last-upload.json"
 
 _TIMEOUT_SECONDS = 60
 _RETRY_DEFAULT = {503: 15.0, 429: 60.0}
-#: A key is printable ASCII without blanks; a product name printable ASCII.
-#: Checked before any request: a line break in a header value would make
-#: the HTTP library fail with the value in its message.
+#: A key is printable ASCII without blanks. Checked before any request: a line
+#: break in a header value would make the HTTP library fail with the value in
+#: its message.
 _KEY_FORM = re.compile(r"[\x21-\x7e]+")
-_HEADER_FORM = re.compile(r"[\x20-\x7e]*")
+#: Not allowed in a product name: control and format characters (invisible ones
+#: like U+200B or U+202E among them), line and paragraph separators, surrogates.
+_NAME_FORBIDDEN = frozenset({"Cc", "Cf", "Zl", "Zp", "Cs"})
+#: How many reachable products a "product_required" answer names at most.
+_PRODUCTS_SHOWN = 10
 _HREF_PREFIX = "/api/v1/"
 
 
@@ -85,12 +90,53 @@ def api_key(environ: Mapping[str, str] | None = None) -> str:
 
 
 def check_product(product: str) -> str:
-    """The product name goes into a header: printable ASCII only."""
-    if not _HEADER_FORM.fullmatch(product):
-        msg = ("The product name holds a line break, a control character or a character "
-               "outside ASCII; give the product's reference or id instead.")
+    """The product's name as it stands in the portal, or its id ``prd_…``, without
+    blanks at the edges. It goes into the X-Product header as UTF-8 bytes, so a line
+    break, a control or an invisible character is refused before any request."""
+    name = product.strip(" \t")     # blanks only: a trailing line break is refused
+    if any(unicodedata.category(c) in _NAME_FORBIDDEN for c in name):
+        msg = ("The product name holds a line break, a control or an invisible character; "
+               "copy the name from the portal again.")
         raise ApiError(msg)
-    return product
+    return name
+
+
+def _clean(text: object) -> str:
+    """A server text for the terminal: control and invisible characters removed."""
+    return "".join(c for c in str(text) if unicodedata.category(c) not in _NAME_FORBIDDEN)
+
+
+def _upload_refusal(code: str, raw: bytes) -> str:
+    """Our own sentence for the codes of the keys per company; "" for any other code."""
+    if code == "api_key_invalid":
+        return (f"The API key is unknown or blocked. Create a key in the portal and set "
+                f"{KEY_ENV}.")
+    if code == "api_key_scope":
+        return ("This API key is limited to other products. Use a key for this product, "
+                "or extend the key in the portal.")
+    if code == "product_unknown":
+        return (f"This product does not exist. Create it in the portal, or check the name "
+                f"in --product or {PRODUCT_ENV}.")
+    if code == "subscription_inactive":
+        return "The subscription is not active. Check it in the portal."
+    if code == "product_required":
+        names: list[str] = []
+        try:
+            err = json.loads(raw.decode("utf-8", errors="replace")).get("error", {})
+            products = err.get("products") if isinstance(err, dict) else None
+        except (json.JSONDecodeError, AttributeError):
+            products = None
+        for item in products if isinstance(products, list) else []:
+            if isinstance(item, dict):
+                name = _clean(item.get("name") or item.get("public_id") or "").strip()
+                if name:
+                    names.append(name[:80])
+        listed = ", ".join(names[:_PRODUCTS_SHOWN])
+        if len(names) > _PRODUCTS_SHOWN:
+            listed += f" and {len(names) - _PRODUCTS_SHOWN} more"
+        return (f"Your key reaches several products. Name one with --product or "
+                f"{PRODUCT_ENV}" + (f": {listed}." if listed else "."))
+    return ""
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -146,10 +192,13 @@ class Client:
 
     def _request(self, path: str, *, data: bytes | None = None, product: str = "",
                  accept: str = "application/json") -> urllib.request.Request:
-        headers = {"X-Api-Key": self._key, "Accept": accept,
-                   "User-Agent": f"jochwacht-sbom/{__version__}"}
-        if product:
-            headers["X-Product"] = check_product(product)
+        headers: dict[str, Any] = {"X-Api-Key": self._key, "Accept": accept,
+                                   "User-Agent": f"jochwacht-sbom/{__version__}"}
+        name = check_product(product)
+        if name:
+            # UTF-8 bytes: http.client would encode a str as latin-1 and fail on
+            # any other character; the API reads the bytes back (contract of 27).
+            headers["X-Product"] = name.encode("utf-8")
         if data is not None:
             headers["Content-Type"] = "application/vnd.cyclonedx+json"
         return urllib.request.Request(  # noqa: S310 — https checked in api_base
@@ -163,8 +212,10 @@ class Client:
             with self._opener.open(req, timeout=_TIMEOUT_SECONDS) as resp:
                 raw = resp.read()
         except urllib.error.HTTPError as exc:
-            code, sentence = _error_text(exc.read(), exc.code, self._key)
-            msg = f"Jochwacht refused the SBOM (HTTP {exc.code} {code}): {sentence}"
+            raw = exc.read()
+            code, sentence = _error_text(raw, exc.code, self._key)
+            ours = _redact(_upload_refusal(code, raw), self._key)
+            msg = f"Jochwacht refused the SBOM (HTTP {exc.code} {code}): {ours or sentence}"
             raise ApiError(msg) from None
         except (urllib.error.URLError, ssl.SSLError, OSError) as exc:
             reason = getattr(exc, "reason", exc)
