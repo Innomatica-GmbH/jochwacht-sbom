@@ -361,6 +361,7 @@ def _yocto_build_components(
 
 def _scan_build_output(
     path: Path, *, max_depth: int, replaced_roots: tuple[Path, ...],
+    warnings: list[str] | None = None,
 ) -> tuple[list[Any], list[str]]:
     """sbom.buildoutput.scan_build_output, except that an image manifest or a
     legal-info/manifest.csv inside a build that was read is replaced by that
@@ -372,10 +373,18 @@ def _scan_build_output(
         find_build_output,
         parse_buildroot_manifest_csv,
         parse_yocto_manifest_file,
+        stated_image_manifests,
     )
 
     root = path.resolve()
-    manifests, legal_dirs = find_build_output(path, max_depth=max_depth)
+    found_manifests, legal_dirs = find_build_output(path, max_depth=max_depth)
+    # Decision (b), coordination 13.11.2026: only the stated image's own
+    # manifest; the bill never names another image's content as the product.
+    # The notes name folders and image names: local warnings only, never in
+    # the sources (which the upload carries).
+    manifests, notes = stated_image_manifests(found_manifests)
+    if warnings is not None:
+        warnings.extend(notes)
     deps: list[Any] = []
     sources: list[str] = []
     for mf in manifests:
@@ -712,6 +721,7 @@ def collect_components(
     try:
         build_output_deps, build_output_sources = _scan_build_output(
             path, max_depth=max_depth, replaced_roots=tuple(replaced_roots),
+            warnings=build_warnings,
         )
     except Exception as exc:  # noqa: BLE001 — a reader defect, recorded, not fatal
         record_failure("build_output", "deploy/images/*.manifest | legal-info/manifest.csv", exc)

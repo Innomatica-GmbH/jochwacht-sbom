@@ -12,6 +12,7 @@ so both tools read build output with the same code.
 from __future__ import annotations
 
 import csv
+import json
 import unicodedata
 from pathlib import Path
 from urllib.parse import quote
@@ -21,6 +22,9 @@ from jochwacht_sbom.sbom.scanner import Dependency
 #: Longest package name taken from build output; a longer "name" is no
 #: package (a stray line), it is left out.
 MAX_NAME = 256
+#: A testdata.json is the image's datastore (a few hundred KiB); larger is
+#: not read.
+MAX_TESTDATA_BYTES = 16 << 20
 
 
 def _clean(text: str) -> str:
@@ -136,6 +140,60 @@ def find_build_output(path: Path, *, max_depth: int = 5) -> tuple[list[Path], li
     return manifests, legal_dirs
 
 
+def _stated_names(folder: Path) -> list[str] | None:
+    """IMAGE_NAME of every regular ``*.testdata.json`` in *folder* (the dated
+    file; the undated name is a link), None when there is none."""
+    names: list[str] = []
+    for testdata in sorted(folder.glob("*.testdata.json")):
+        if testdata.is_symlink() or not testdata.is_file():
+            continue
+        try:
+            if testdata.stat().st_size > MAX_TESTDATA_BYTES:
+                continue
+            data = json.loads(testdata.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        name = data.get("IMAGE_NAME") if isinstance(data, dict) else None
+        if isinstance(name, str) and name and "/" not in name:
+            names.append(name)
+    return names or None
+
+
+def stated_image_manifests(manifests: list[Path]) -> tuple[list[Path], list[str]]:
+    """The manifests to read, and what to say about the rest.
+
+    Per folder: where a testdata.json states the image(s), only each stated
+    image's ``IMAGE_NAME.manifest`` — and none of the folder if one of them is
+    missing (coordination 13.11.2026: the bill never names another image's
+    content as the product). Without a testdata.json every manifest, as
+    before, with a warning when the folder holds several different ones.
+    """
+    by_folder: dict[Path, list[Path]] = {}
+    for mf in manifests:
+        by_folder.setdefault(mf.parent, []).append(mf)
+    selected: list[Path] = []
+    notes: list[str] = []
+    for folder, found in by_folder.items():
+        stated = _stated_names(folder)
+        if stated is None:
+            selected.extend(found)
+            distinct = {p.resolve() for p in found}
+            if len(distinct) > 1:
+                notes.append(f"warning: {len(distinct)} image manifests in "
+                              f"{_clean(folder.name)} without testdata.json, all read "
+                              "(which image is the product is not stated)")
+            continue
+        wanted = {f"{name}.manifest" for name in stated}
+        present = {p.name: p for p in found if p.name in wanted and not p.is_symlink()}
+        missing = sorted(wanted - set(present))
+        if missing:
+            notes.append(f"skipped yocto image manifests in {_clean(folder.name)}: the stated "
+                         f"image's manifest {_clean(missing[0])} is missing")
+            continue
+        selected.extend(present[name] for name in sorted(present))
+    return selected, notes
+
+
 def scan_build_output(
     path: Path, *, max_depth: int = 5,
 ) -> tuple[list[Dependency], list[str]]:
@@ -144,9 +202,10 @@ def scan_build_output(
     Returns:
         (dependencies, human-readable source descriptions)
     """
-    manifests, legal_dirs = find_build_output(path, max_depth=max_depth)
+    found_manifests, legal_dirs = find_build_output(path, max_depth=max_depth)
+    manifests, notes = stated_image_manifests(found_manifests)
     deps: list[Dependency] = []
-    sources: list[str] = []
+    sources: list[str] = list(notes)
     for mf in manifests:
         try:
             found = parse_yocto_manifest_file(mf)
