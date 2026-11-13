@@ -136,7 +136,7 @@ def test_whatever_a_build_file_states_the_bill_stays_valid(spec: str, stated: st
     ],
 )
 def test_wording_goes_to_the_field_that_fits_it(stated: str, expected: dict) -> None:
-    from jochwacht_sbom.licenses import cyclonedx_licenses
+    from jochwacht_sbom.sbom.licenses import cyclonedx_licenses
 
     assert cyclonedx_licenses(stated) == [expected]
 
@@ -147,7 +147,7 @@ def test_the_vendored_list_matches_the_one_the_schemas_carry() -> None:
 
     import cyclonedx.schema._res as schema_res
 
-    from jochwacht_sbom.licenses import _spdx_identifiers, spdx_license_list_version
+    from jochwacht_sbom.sbom.licenses import _spdx_identifiers, spdx_license_list_version
 
     spdx_schema = json.loads(
         resources.files(schema_res)

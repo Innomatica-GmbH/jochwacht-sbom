@@ -141,3 +141,25 @@ def test_send_uploads_the_slim_copy_it_shows(tmp_path: Path, monkeypatch: Any) -
     assert b"SHA-512" not in sent[0]
     assert b"SHA-512" in (root / "sbom.cdx.json").read_bytes()
     assert "sent.cdx.json" in " ".join(res.output.split())
+
+
+def test_the_binary_carries_the_spdx_lists() -> None:
+    """The shared licence library reads two YAML lists at run time; the
+    PyInstaller spec must bundle them (it bundled none before 0.20)."""
+    spec = (Path(__file__).resolve().parents[1] / "jochwacht-sbom.spec").read_text()
+    assert '"src/jochwacht_sbom/sbom/data/*.yaml"' in spec
+    data = Path(__file__).resolve().parents[1] / "src" / "jochwacht_sbom" / "sbom" / "data"
+    assert {p.name for p in data.glob("*.yaml")} == {
+        "spdx_license_ids.yaml", "spdx_exception_ids.yaml"}
+
+
+def test_licence_text_that_is_not_valid_spdx_stays_text() -> None:
+    """suite-c measured on zc706: 'GPL-3.0+ with exceptions' and 'EPL-2.0 or
+    EDLv1.0' were written as expressions; the shared strict rule keeps them text."""
+    from jochwacht_sbom.sbom.licenses import cyclonedx_licenses
+
+    for raw in ("GPL-3.0+ with exceptions", "EPL-2.0 or EDLv1.0", "BSD-3-Clause or GPL-2.0"):
+        got = cyclonedx_licenses(raw)
+        assert "expression" not in got[0] or raw == "BSD-3-Clause or GPL-2.0", (raw, got)
+    assert cyclonedx_licenses("BSD-3-Clause or GPL-2.0") == [
+        {"expression": "BSD-3-Clause OR GPL-2.0"}]

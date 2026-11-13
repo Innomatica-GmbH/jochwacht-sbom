@@ -115,8 +115,8 @@ def _buildroot_build_components(
     excluded from the payload and from the upload.
     """
     from jochwacht_sbom.buildroot_build import read_buildroot_builds
-    from jochwacht_sbom.licenses import normalize_license
     from jochwacht_sbom.sbom.build_files import join_licenses
+    from jochwacht_sbom.sbom.licenses import normalize_license
 
     def classify(text: str) -> tuple[str, str] | None:
         value = normalize_license(text)

@@ -11,7 +11,9 @@ a = Analysis(
     ["src/jochwacht_sbom/cli.py"],
     pathex=["src"],
     binaries=[],
-    datas=[],
+    # The SPDX lists of the shared licence library (sbom/licenses.py reads them
+    # at run time); without them the binary could not classify a licence.
+    datas=[("src/jochwacht_sbom/sbom/data/*.yaml", "jochwacht_sbom/sbom/data")],
     hiddenimports=[
         "jochwacht_sbom.payload",
         "jochwacht_sbom.collector",

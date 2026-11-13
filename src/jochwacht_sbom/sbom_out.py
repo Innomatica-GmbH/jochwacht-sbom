@@ -28,8 +28,8 @@ from typing import TYPE_CHECKING
 
 from jochwacht_sbom import __version__, properties
 from jochwacht_sbom.core.exceptions import JochwachtError
-from jochwacht_sbom.licenses import cyclonedx_licenses
 from jochwacht_sbom.sbom import cdx_files
+from jochwacht_sbom.sbom.licenses import cyclonedx_licenses
 from jochwacht_sbom.sbom.scanner import _make_purl
 
 if TYPE_CHECKING:
