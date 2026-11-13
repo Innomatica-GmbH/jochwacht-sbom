@@ -196,6 +196,51 @@ def _buildroot_build_components(
     return out
 
 
+def _yocto_build_components(
+    path: Path, record_failure: Any,
+) -> list[CheckComponent]:
+    """The packages and images of every Yocto build under *path*.
+
+    suite-d's finder (yocto_build.py) and the shared core
+    (sbom/build_files_yocto.py) read the build with the image manifest's
+    names; this writes them onto CheckComponent like the Buildroot packages.
+    The build evidence sits in fields excluded from the payload and from the
+    upload. No licence: the core passes none the build proves per package.
+    """
+    from jochwacht_sbom.sbom.buildoutput import _purl
+    from jochwacht_sbom.sbom.classify import strip_control_chars as clean
+    from jochwacht_sbom.yocto_build import read_yocto_builds
+
+    try:
+        reads = read_yocto_builds(path)
+    except Exception as exc:  # noqa: BLE001 — a reader defect, recorded, not fatal
+        record_failure("yocto_build", "deploy/images/*.manifest", exc)
+        return []
+    out: list[CheckComponent] = []
+    for read in reads:
+        build = read.build
+        for (raw_name, raw_version), entry in zip(read.packages, build.entries, strict=True):
+            name, version = clean(raw_name), clean(raw_version)
+            out.append(CheckComponent(
+                name=name, version=version, ecosystem="yocto",
+                local_purl=_purl("yocto", name, version), source_type="build-output",
+                tier=_LOCKFILE_TIER, confidence=_LOCKFILE_CONFIDENCE,
+                scope="excluded" if entry.excluded else "",
+                scope_reason=build.scope_reason if entry.excluded else "",
+                delivered_files=list(entry.files), not_evidenced=entry.not_evidenced,
+                creator_url=entry.creator.url if entry.creator else "",
+                creator_origin=entry.creator.origin if entry.creator else "",
+                creator_gap=entry.creator_gap,
+            ))
+        for image in build.images:
+            out.append(CheckComponent(
+                name=clean(Path(image.path).name), ecosystem="yocto",
+                source_type="build-output", tier=_LOCKFILE_TIER,
+                confidence=_LOCKFILE_CONFIDENCE, delivered_image=image,
+            ))
+    return out
+
+
 def collect_components(
     path: Path,
     *,
@@ -481,6 +526,9 @@ def collect_components(
     # delivered files and what they prove, read by the shared core. Its
     # packages replace the legal-info/manifest.csv rows of the same build.
     build_comps = _buildroot_build_components(path, record_failure)
+    # Path 3b: a Yocto BUILD DIRECTORY (bitbake TMPDIR, 0.20, suite-d): its
+    # packages replace the *.rootfs.manifest rows of the same build.
+    yocto_comps = _yocto_build_components(path, record_failure)
 
     # Path 3: Yocto/Buildroot BUILD OUTPUT — what is actually in the
     # customer's image (run the check in the build directory).
@@ -495,6 +543,15 @@ def collect_components(
         build_output_deps, build_output_sources = [], []
     if build_comps:
         build_output_deps = [d for d in build_output_deps if d.ecosystem != "buildroot"]
+    if yocto_comps:
+        # Only the rows the read build carries itself (the same manifest
+        # lines): a manifest-only tree elsewhere in the path keeps its rows.
+        read_rows = {(c.name, c.version) for c in yocto_comps if c.delivered_image is None}
+        build_output_deps = [
+            d for d in build_output_deps
+            if d.ecosystem != "yocto"
+            or (strip_control_chars(d.name), strip_control_chars(d.version)) not in read_rows
+        ]
     for dep in build_output_deps:
         clean_dependency(dep)  # control-char hygiene
         # Resolved, installed packages — the skip list never applies.
@@ -515,7 +572,7 @@ def collect_components(
     # Real components first, then the marked alternatives. The
     # component COUNT and the ecosystem list cover only real components; the
     # conditional ones are surfaced through stats.conditional.
-    real = list(merged.values()) + build_comps
+    real = list(merged.values()) + build_comps + yocto_comps
     components = real + conditional_comps
     ecosystems = sorted({c.ecosystem for c in real if c.ecosystem})
 
