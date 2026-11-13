@@ -107,12 +107,23 @@ class TestSendConfirmsBeforePost:
         assert up.call_count == 1
 
     def test_send_sends_the_written_sbom(self, tmp_path: Path) -> None:
-        # 12.11.2026: what leaves the house is the SBOM file as written.
+        # 12.11.2026: what leaves the house is a file the customer can open.
+        # 0.20: it is the slim copy .jochwacht/sent.cdx.json; without build
+        # evidence it says the same as the local bill (serial and time aside).
+        import json as _json
+
         proj = _project(tmp_path)
         with patch("jochwacht_sbom.api.Client.upload", return_value=_ANSWER) as up:
             res = CliRunner().invoke(main, [str(proj), "--send", "--yes"], env=_ENV)
         assert res.exit_code == 0, res.output
-        assert up.call_args[0][0] == (proj / "sbom.cdx.json").read_bytes()
+        sent = (proj / ".jochwacht" / "sent.cdx.json").read_bytes()
+        assert up.call_args[0][0] == sent
+        local = _json.loads((proj / "sbom.cdx.json").read_text(encoding="utf-8"))
+        copy = _json.loads(sent)
+        for doc in (local, copy):
+            doc.pop("serialNumber")
+            doc["metadata"].pop("timestamp")
+        assert copy == local
 
     def test_send_without_key_fails_before_scanning(
         self, tmp_path: Path,

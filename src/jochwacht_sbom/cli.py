@@ -32,6 +32,7 @@ from jochwacht_sbom.sbom_out import (
     SPEC_VERSION,
     SPEC_VERSIONS,
     classify_existing,
+    slim_bytes,
     write_cyclonedx,
 )
 from jochwacht_sbom.upload import DEFAULT_SUBMIT_URL, serialize_payload
@@ -286,13 +287,15 @@ def _stdin_is_terminal() -> bool:
 
 
 def _print_leaving_summary(written: Path, n_components: int, base: str, product: str) -> None:
-    """What leaves the house: the SBOM file exactly as written — the customer
+    """What leaves the house: the upload copy exactly as written — the customer
     can open it and see every field before saying yes."""
     noun = "component" if n_components == 1 else "components"
     host = base.split("://", 1)[-1]
     console.print(
-        f"\n[bold]This would be sent[/bold] to {fg(host)}: {fg(written.name)} exactly as "
-        f"written ({n_components} {noun}; open the file to see every field).",
+        f"\n[bold]This would be sent[/bold] to {fg(host)}: {fg(str(written))} exactly as "
+        f"written ({n_components} {noun}; open the file to see every field). Names, "
+        f"versions and your own declarations only; what a build directory proves "
+        f"(file hashes, file names, creator) stays in your local bill.",
         soft_wrap=True,
     )
     if product:
@@ -632,9 +635,15 @@ def _run(  # noqa: PLR0913 — mirrors the CLI surface
         return
 
     # --- The send path: show what leaves the house, then ask -------------
-    n_sent = len(components)
+    # The upload is the slim copy (0.20): the build evidence stays local. It is
+    # written first, so the customer can open exactly what is sent.
+    upload_copy = path / ".jochwacht" / "sent.cdx.json"
+    upload_copy.parent.mkdir(parents=True, exist_ok=True)
+    upload_copy.write_bytes(slim_bytes(components, stats, project_name=path.resolve().name,
+                                       spec_version=spec_version))
+    n_sent = len([c for c in components if c.delivered_image is None])
     if not assume_yes:
-        _print_leaving_summary(written, n_sent, api_base, product)
+        _print_leaving_summary(upload_copy, n_sent, api_base, product)
         if _stdin_is_terminal():
             if not click.confirm("Send this SBOM to Jochwacht?", default=False):
                 console.print("[yellow]Nothing was sent.[/yellow]")
@@ -645,7 +654,7 @@ def _run(  # noqa: PLR0913 — mirrors the CLI surface
             # that hangs or fails there, but a line that says so
             # --yes stays for a terminal.
             console.print("sending without confirmation (no terminal)")
-    answer = api.Client(api_base, api_key).upload(written.read_bytes(), product=product)
+    answer = api.Client(api_base, api_key).upload(upload_copy.read_bytes(), product=product)
     kept = api.save_last_upload(path, api_base, answer)
     state = answer.get("status", "?")
     console.print(

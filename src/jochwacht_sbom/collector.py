@@ -15,7 +15,7 @@ anywhere, instantly, with zero setup.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from jochwacht_sbom.analyzer.normalize import normalize_dep_name
 from jochwacht_sbom.analyzer.pipeline import run_pipeline
@@ -102,6 +102,57 @@ def _identity(name: str) -> str:
     ``@docusaurus/utils``. Each has its own version and its own CVE history.
     """
     return name.strip().lower()
+
+
+def _buildroot_build_components(
+    path: Path, record_failure: Any,
+) -> list[CheckComponent]:
+    """The packages and images of every Buildroot build under *path*.
+
+    Read by the shared core (sbom/build_files.py via buildroot_build); the
+    licence is joined with the collector's licence library by the shared rule.
+    Nothing here leaves the house: the build evidence sits in fields that are
+    excluded from the payload and from the upload.
+    """
+    from jochwacht_sbom.buildroot_build import read_buildroot_builds
+    from jochwacht_sbom.licenses import normalize_license
+    from jochwacht_sbom.sbom.build_files import join_licenses
+
+    def classify(text: str) -> tuple[str, str] | None:
+        value = normalize_license(text)
+        return (value.kind, value.value) if value is not None else None
+
+    try:
+        builds = read_buildroot_builds(path)
+    except Exception as exc:  # noqa: BLE001 — a reader defect, recorded, not fatal
+        record_failure("buildroot_build", "legal-info/buildroot.cdx.json", exc)
+        return []
+    out: list[CheckComponent] = []
+    for build in builds:
+        for pb in build.packages:
+            pkg = pb.package
+            licence = join_licenses(pkg.licenses, classify=classify) or ""
+            out.append(CheckComponent(
+                name=pkg.name, version=pkg.version, ecosystem="buildroot",
+                local_purl=pkg.purl, source_type="build-output",
+                tier=_LOCKFILE_TIER, confidence=_LOCKFILE_CONFIDENCE,
+                scope="excluded" if pkg.host_reason else "",
+                scope_reason=pb.scope_reason,
+                local_license=licence,
+                local_license_origin="buildroot:legal-info/buildroot.cdx.json" if licence else "",
+                local_cpe=pkg.cpe, patches=[dict(p) for p in pkg.patches],
+                delivered_files=list(pb.files), not_evidenced=pb.not_evidenced,
+                creator_url=pb.creator.url if pb.creator else "",
+                creator_origin=pb.creator.origin if pb.creator else "",
+                creator_gap=pb.creator_gap,
+            ))
+        for image in build.images:
+            out.append(CheckComponent(
+                name=Path(image.path).name, ecosystem="buildroot",
+                source_type="build-output", tier=_LOCKFILE_TIER,
+                confidence=_LOCKFILE_CONFIDENCE, delivered_image=image,
+            ))
+    return out
 
 
 def collect_components(
@@ -381,6 +432,11 @@ def collect_components(
             scope="excluded" if is_excluded else "optional",
         )
 
+    # Path 3a: a Buildroot BUILD DIRECTORY (0.20): Buildroot's own SBOM, the
+    # delivered files and what they prove, read by the shared core. Its
+    # packages replace the legal-info/manifest.csv rows of the same build.
+    build_comps = _buildroot_build_components(path, record_failure)
+
     # Path 3: Yocto/Buildroot BUILD OUTPUT — what is actually in the
     # customer's image (run the check in the build directory).
     from jochwacht_sbom.sbom.buildoutput import scan_build_output
@@ -392,6 +448,8 @@ def collect_components(
     except Exception as exc:  # noqa: BLE001 — a reader defect, recorded, not fatal
         record_failure("build_output", "deploy/images/*.manifest | legal-info/manifest.csv", exc)
         build_output_deps, build_output_sources = [], []
+    if build_comps:
+        build_output_deps = [d for d in build_output_deps if d.ecosystem != "buildroot"]
     for dep in build_output_deps:
         clean_dependency(dep)  # control-char hygiene
         # Resolved, installed packages — the skip list never applies.
@@ -412,7 +470,7 @@ def collect_components(
     # Real components first, then the marked alternatives. The
     # component COUNT and the ecosystem list cover only real components; the
     # conditional ones are surfaced through stats.conditional.
-    real = list(merged.values())
+    real = list(merged.values()) + build_comps
     components = real + conditional_comps
     ecosystems = sorted({c.ecosystem for c in real if c.ecosystem})
 

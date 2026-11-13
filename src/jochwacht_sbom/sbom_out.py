@@ -29,6 +29,7 @@ from typing import TYPE_CHECKING
 from jochwacht_sbom import __version__, properties
 from jochwacht_sbom.core.exceptions import JochwachtError
 from jochwacht_sbom.licenses import cyclonedx_licenses
+from jochwacht_sbom.sbom import cdx_files
 from jochwacht_sbom.sbom.scanner import _make_purl
 
 if TYPE_CHECKING:
@@ -70,18 +71,68 @@ def _bom_ref(comp: CheckComponent) -> str:
     return f"{comp.name}@{comp.version}" if comp.version else comp.name
 
 
-def _components_with_refs(components: list[CheckComponent]) -> list[dict[str, object]]:
-    """Components with unique ``bom-ref`` values; a repeat gets ``#n``."""
+def _components_with_refs(
+    components: list[CheckComponent], *, full: bool = True, creator_ok: bool = True,
+) -> list[dict[str, object]]:
+    """Components with unique ``bom-ref`` values; a repeat gets ``#n``.
+
+    *full*: the local bill with what a build directory proves (shared writer
+    ``sbom/cdx_files.py``); False: the upload, as slim as in 0.19.
+    """
     out: list[dict[str, object]] = []
     seen: dict[str, int] = {}
     for comp in components:
+        if not full and comp.delivered_image is not None:
+            continue  # an image without a package is build evidence only
+        base = _bom_ref(comp)
+        n = seen.get(base, 0)
+        seen[base] = n + 1
+        ref = base if n == 0 else f"{base}#{n + 1}"
         entry = _component(comp)
-        ref = _bom_ref(comp)
-        n = seen.get(ref, 0)
-        seen[ref] = n + 1
-        entry["bom-ref"] = ref if n == 0 else f"{ref}#{n + 1}"
+        if full:
+            entry = _with_build_evidence(entry, comp, ref=ref, creator_ok=creator_ok)
+        entry["bom-ref"] = ref
         out.append(entry)
     return out
+
+
+def _with_build_evidence(
+    entry: dict[str, object], comp: CheckComponent, *, ref: str, creator_ok: bool,
+) -> dict[str, object]:
+    """The local bill: licence, CPE, patches, delivered files and creator that
+    the build directory proves, written by the shared writer and marked."""
+    if comp.delivered_image is not None:
+        return cdx_files.image_component(comp.delivered_image, name=comp.name,
+                                         version=comp.version)
+    props = entry.setdefault("properties", [])
+    if comp.local_license and "licenses" not in entry:
+        licences = cyclonedx_licenses(comp.local_license)
+        if licences:
+            entry["licenses"] = licences
+            if isinstance(props, list):
+                props.append({"name": properties.name("evidence:license"),
+                              "value": comp.local_license_origin})
+    if comp.local_cpe and "cpe" not in entry:
+        entry["cpe"] = comp.local_cpe
+    if comp.patches:
+        entry["pedigree"] = {"patches": list(comp.patches)}
+    if comp.delivered_files:
+        entry["components"] = cdx_files.file_components(
+            comp.delivered_files, parent_ref=ref, package_name=comp.name,
+            version=comp.version, package_license=comp.local_license or comp.license,
+            to_licenses=cyclonedx_licenses)
+    cdx_files.apply_creator(entry, package_name=comp.name, url=comp.creator_url,
+                            origin=comp.creator_origin, gap=comp.creator_gap,
+                            field_ok=creator_ok)
+    if cdx_files.is_logical(excluded=comp.scope == "excluded", is_image=False,
+                            has_files=bool(comp.delivered_files),
+                            not_evidenced=comp.not_evidenced):
+        cdx_files.mark_logical(entry)
+    if comp.not_evidenced and isinstance(props, list):
+        props.append({"name": properties.name("not-evidenced"), "value": comp.not_evidenced})
+    if not props:
+        entry.pop("properties", None)
+    return entry
 
 
 def _component(comp: CheckComponent) -> dict[str, object]:
@@ -150,8 +201,12 @@ def build_cyclonedx(
     *,
     project_name: str,
     spec_version: str = SPEC_VERSION,
+    full: bool = True,
 ) -> dict[str, object]:
     """Build the CycloneDX document for *components*.
+
+    *full* (default): the local bill, with the build evidence. ``full=False``:
+    what ``--send`` uploads, without it (see :func:`slim_bytes`).
 
     Args:
         components: What the check collected.
@@ -192,8 +247,28 @@ def build_cyclonedx(
                 "version": "unspecified",
             },
         },
-        "components": _components_with_refs(components),
+        "components": _components_with_refs(
+            components, full=full, creator_ok=spec_version not in ("1.5",)),
     }
+
+
+def slim_bytes(
+    components: list[CheckComponent],
+    stats: CheckStats,
+    *,
+    project_name: str,
+    spec_version: str = SPEC_VERSION,
+) -> bytes:
+    """What ``--send`` uploads: the bill without the build evidence.
+
+    The promise of this tool (coordination, 13.11.2026): without the
+    customer's explicit choice only names, versions and their own declarations
+    leave the house. Hashes, file names, file components, the creator, the
+    licence and CPE a build proves stay in the local file.
+    """
+    doc = build_cyclonedx(components, stats, project_name=project_name,
+                          spec_version=spec_version, full=False)
+    return (json.dumps(doc, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
 
 
 #: Jeder Name, mit dem dieses Werkzeug seine Ausgabe signiert. Seit dem

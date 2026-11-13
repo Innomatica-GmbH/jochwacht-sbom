@@ -306,7 +306,8 @@ def test_send_uploads_the_written_sbom_and_saves_the_answer(
     res = CliRunner().invoke(cli.main, [str(proj), "--send", "--yes"],
                              env={"JOCHWACHT_API_KEY": KEY})
     assert res.exit_code == 0, res.output
-    assert sent == [(proj / "sbom.cdx.json").read_bytes()]
+    # 0.20: the slim copy is uploaded, written first so it can be opened
+    assert sent == [(proj / ".jochwacht" / "sent.cdx.json").read_bytes()]
     saved = json.loads((proj / ".jochwacht" / "last-upload.json").read_text(encoding="utf-8"))
     assert saved["answer"]["status_href"] == HREF
     assert KEY not in res.output

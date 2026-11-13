@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import hashlib
 from datetime import UTC, datetime
-from typing import Final, Literal
+from typing import Any, Final, Literal
 
 from pydantic import BaseModel, Field
 
@@ -73,6 +73,20 @@ class CheckComponent(BaseModel):
     #: built with OpenSSL or LibreSSL — configure once", but it is never
     #: counted as a present component and never gates the traffic light.
     condition: str = ""
+    #: What a build directory proves (0.20, coordination 13.11.2026). LOCAL bill
+    #: only, all excluded from the payload: the upload stays names, versions and
+    #: own declarations unless the customer chooses otherwise. The records are
+    #: the shared core's (sbom/build_files.FileRecord, Creator).
+    local_license: str = Field(default="", exclude=True)
+    local_license_origin: str = Field(default="", exclude=True)
+    local_cpe: str = Field(default="", exclude=True)
+    patches: list[dict[str, Any]] = Field(default_factory=list, exclude=True)
+    delivered_files: list[Any] = Field(default_factory=list, exclude=True)
+    delivered_image: Any = Field(default=None, exclude=True)
+    not_evidenced: str = Field(default="", exclude=True)
+    creator_url: str = Field(default="", exclude=True)
+    creator_origin: str = Field(default="", exclude=True)
+    creator_gap: str = Field(default="", exclude=True)
 
 
 class CheckStats(BaseModel):
