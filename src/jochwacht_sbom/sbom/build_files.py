@@ -25,6 +25,7 @@ import hashlib
 import os
 import re
 import stat
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import BinaryIO
@@ -798,3 +799,213 @@ def buildroot_product(build_dir: Path) -> tuple[str, str]:
     if isinstance(comp, dict) and isinstance(comp.get("name"), str):
         return comp["name"], str(comp.get("version", "") or "")
     return "", ""
+
+
+# --- One composition of a Buildroot build -------------------------------------
+#
+# What import_buildroot composed in the suite, now once for suite and collector
+# (agreed with suite-b, 13.11.2026). The suite maps it onto its Dependency, the
+# collector onto its records; parity is built in.
+
+@dataclass(frozen=True)
+class FileRecord:
+    """A delivered file that is a component, with where its assignment is proven."""
+
+    path: str
+    sha512: str
+    executable: bool | None
+    archive: bool | None
+    structured: bool | None
+    origin: str
+
+
+def _record(f: FileFacts, origin: str) -> FileRecord:
+    return FileRecord(path=f.path, sha512=f.sha512, executable=f.executable,
+                      archive=f.archive, structured=f.structured, origin=origin)
+
+
+def component_files(ev: ComponentEvidence, *, every_file: bool = False,
+                    ) -> tuple[list[FileRecord], int]:
+    """The files of *ev* that are components (§3.2.1: code or archive; with
+    *every_file* each one, for images), and how many may be code but are not
+    proven (counted, not listed)."""
+    records = [_record(f, ev.origin) for f in ev.files if every_file or is_component_file(f)]
+    unclassified = 0 if every_file else sum(1 for f in ev.files if _unclassified(f))
+    return records, unclassified
+
+
+def join_licenses(parts: tuple[str, ...] | list[str], *,
+                  classify: Callable[[str], tuple[str, str] | None]) -> str | None:
+    """suite-b's rule for Buildroot's license parts, in one place.
+
+    *classify* is the half's own license library: (kind, value) with kind
+    "id", "expression" or anything else for free text; None for no statement
+    ("unknown"). Every part an SPDX id or expression: joined with AND (an
+    expression in parentheses); free text among them: "; " (an expression
+    would be invalid). Nothing dropped but non-statements, nothing made up.
+    """
+    kept = [(p, k) for p in parts if (k := classify(p)) is not None]
+    if not kept:
+        return None
+    if len(kept) == 1:
+        return kept[0][0]
+    if all(k[0] in ("id", "expression") for _, k in kept):
+        return " AND ".join(f"({k[1]})" if k[0] == "expression" else p for p, k in kept)
+    return "; ".join(p for p, _ in kept)
+
+
+def host_scope_reason(pkg: BuildrootPackage) -> str:
+    """The scope reason of a host package, the same sentence in both halves."""
+    if not pkg.host_reason:
+        return ""
+    return (f"Buildroot host package ({pkg.bom_ref}): built for the build machine, "
+            "not shipped")
+
+
+@dataclass
+class EntryEvidence:
+    """What the build directory proves for one package (by name)."""
+
+    name: str
+    excluded: bool
+    files: list[FileRecord]
+    unclassified: int
+    not_evidenced: str
+    creator: Creator | None
+    creator_gap: str
+
+
+@dataclass
+class BuildEvidence:
+    """The build directory's proof for a list of packages, plus what it holds
+    without a package."""
+
+    entries: list[EntryEvidence]
+    images: list[FileRecord]           # images/ without a package: code or archive
+    warnings: list[str]
+    sources: list[str]
+
+
+def buildroot_build_evidence(
+    build_dir: Path,
+    entries: list[tuple[str, bool]],
+    *,
+    buildroot_source: Path | None = None,
+) -> BuildEvidence | None:
+    """Delivered files, images/ and the creator for (name, excluded) entries.
+
+    None without ``packages-file-list.txt``: then nothing is proven and nothing
+    changes. Works for any package list (the suite's manifest.csv fallback
+    brings names, not records).
+    """
+    left_out: dict[str, int] = {}
+    evidence = buildroot_evidence(build_dir, counts=left_out)
+    if not evidence:
+        return None
+    sources = [f"{ORIGIN_BUILDROOT_TARGET} (output/target)"]
+    warnings: list[str] = []
+    if any(left_out.values()):
+        warnings.append(
+            f"packages-file-list.txt: {left_out['not_regular_or_gone']} listed path(s) "
+            "not a delivered regular file (symlink, removed at target-finalize, "
+            f"outside); {left_out['shared_paths']} path(s) claimed by two packages, "
+            "given to neither")
+    image_origin = {"linux": ORIGIN_BUILDROOT_IMAGES_LINUX, "uboot": ORIGIN_BUILDROOT_IMAGES_UBOOT}
+    per_package, rest = buildroot_image_evidence(build_dir)
+    delivered_names = [name for name, excluded in entries if not excluded]
+    creators, creator_gaps = buildroot_creators(
+        build_dir, delivered_names,
+        delivered={k: list(v.files) for k, v in evidence.items()},
+        source=buildroot_source)
+    out: list[EntryEvidence] = []
+    for name, excluded in entries:
+        if excluded:
+            out.append(EntryEvidence(name, True, [], 0, REASON_NOT_DELIVERED, None, ""))
+            continue
+        ev = evidence.get(name) or ComponentEvidence(name, (), ORIGIN_BUILDROOT_TARGET)
+        files, unclassified = component_files(ev)
+        reason = (REASON_NO_DELIVERED_FILE if not ev.files
+                  else "" if files else REASON_NO_EXECUTABLE_FILE)
+        images = per_package.get(name)
+        if images:
+            known = {f.path for f in files}
+            files += [r for r in component_files(
+                ComponentEvidence(name, tuple(images), image_origin[name]), every_file=True)[0]
+                if r.path not in known]
+            if files:
+                reason = ""
+        creator = creators.get(name)
+        out.append(EntryEvidence(name, False, files, unclassified, reason, creator,
+                                 "" if creator else creator_gaps.get(name, "")))
+    images_rest = [_record(f, ORIGIN_BUILDROOT_IMAGES) for f in rest if is_component_file(f)]
+    skipped = [f.path for f in rest if not is_component_file(f)]
+    if skipped:
+        warnings.append("images/ files that are no component (not code, no archive by its "
+                        "bytes): " + ", ".join(skipped))
+    return BuildEvidence(out, images_rest, warnings, sources)
+
+
+@dataclass
+class BuildrootPackageBuild:
+    """A package of Buildroot's SBOM with what the build directory proves."""
+
+    package: BuildrootPackage
+    files: list[FileRecord]
+    unclassified: int
+    not_evidenced: str
+    creator: Creator | None
+    creator_gap: str
+    scope_reason: str
+
+
+@dataclass
+class BuildrootBuild:
+    """A Buildroot build as suite and collector describe it."""
+
+    product_name: str
+    product_version: str
+    packages: list[BuildrootPackageBuild]
+    images: list[FileRecord]
+    warnings: list[str]
+    sources: list[str]
+
+    def delivered_packages(self) -> list[BuildrootPackageBuild]:
+        """What the product contains of the packages (§3.2.7): not the host ones.
+        The images without a package (``images``) are delivered as well."""
+        return [p for p in self.packages if not p.package.host_reason]
+
+
+def read_buildroot_build(
+    build_dir: Path, *, buildroot_source: Path | None = None,
+) -> BuildrootBuild | None:
+    """Buildroot's own SBOM plus what the build directory proves, composed once.
+
+    None when the folder holds no Buildroot SBOM and nothing to say about it.
+    """
+    packages, warnings = buildroot_packages(build_dir)
+    if not packages and not warnings:
+        return None
+    sbom = buildroot_sbom_file(build_dir)
+    sources = [str(sbom.relative_to(build_dir))] if sbom is not None else []
+    seen: set[tuple[str, bool, str, str]] = set()
+    unique: list[BuildrootPackage] = []
+    for pkg in packages:  # host and target apart even with one purl (F3)
+        key = (pkg.purl, bool(pkg.host_reason), pkg.name, pkg.version)
+        if key not in seen:
+            seen.add(key)
+            unique.append(pkg)
+    ev = buildroot_build_evidence(build_dir, [(p.name, bool(p.host_reason)) for p in unique],
+                                  buildroot_source=buildroot_source)
+    builds: list[BuildrootPackageBuild] = []
+    for i, pkg in enumerate(unique):
+        e = ev.entries[i] if ev is not None else None
+        builds.append(BuildrootPackageBuild(
+            package=pkg, files=e.files if e else [], unclassified=e.unclassified if e else 0,
+            not_evidenced=e.not_evidenced if e else "", creator=e.creator if e else None,
+            creator_gap=e.creator_gap if e else "", scope_reason=host_scope_reason(pkg)))
+    name, version = buildroot_product(build_dir)
+    return BuildrootBuild(
+        product_name=name, product_version=version, packages=builds,
+        images=ev.images if ev is not None else [],
+        warnings=warnings + (ev.warnings if ev is not None else []),
+        sources=sources + (ev.sources if ev is not None else []))
