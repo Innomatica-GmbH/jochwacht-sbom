@@ -1,0 +1,18 @@
+PN: sysvinit-inittab
+PV: 2.88dsf
+PR: r0
+PKGV: 2.88dsf
+PKGR: r0
+LICENSE: GPL-2.0-only
+DESCRIPTION: Inittab configuration for SysVinit.
+SUMMARY: Inittab configuration for SysVinit
+RDEPENDS:sysvinit-inittab: ttyrun
+RCONFLICTS:sysvinit-inittab: busybox-inittab
+SECTION: base
+PKG:sysvinit-inittab: sysvinit-inittab
+FILES:sysvinit-inittab: /etc/inittab /bin/start_getty
+CONFFILES:sysvinit-inittab: /etc/inittab
+FILES_INFO:sysvinit-inittab: {"/bin/start_getty": 383, "/etc/inittab": 1186}
+FILERDEPENDSFLIST:sysvinit-inittab: /bin/start@underscore@getty
+FILERDEPENDS:/bin/start@underscore@getty:sysvinit-inittab:  /bin/sh
+PKGSIZE:sysvinit-inittab: 1569

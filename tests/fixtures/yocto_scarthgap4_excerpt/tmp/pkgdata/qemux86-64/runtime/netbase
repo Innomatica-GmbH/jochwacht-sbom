@@ -1,0 +1,15 @@
+PN: netbase
+PE: 1
+PV: 6.4
+PR: r0
+PKGE: 1
+PKGV: 6.4
+PKGR: r0
+LICENSE: GPL-2.0-only
+DESCRIPTION: This package provides the necessary infrastructure for basic TCP/IP based networking
+SUMMARY: Basic TCP/IP networking support
+SECTION: base
+PKG:netbase: netbase
+FILES:netbase: /usr/bin/* /usr/sbin/* /usr/libexec/* /usr/lib/lib*.so.*             /etc /com /var             /bin/* /sbin/*             /lib/*.so.*             /lib/udev /usr/lib/udev             /lib/udev /usr/lib/udev             /usr/share/netbase /usr/lib/netbase/*             /usr/share/pixmaps /usr/share/applications             /usr/share/idl /usr/share/omf /usr/share/sounds             /usr/lib/bonobo/servers
+FILES_INFO:netbase: {"/etc/ethertypes": 1853, "/etc/protocols": 3144, "/etc/rpc": 911, "/etc/services": 12813}
+PKGSIZE:netbase: 18721

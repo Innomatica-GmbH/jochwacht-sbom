@@ -1,0 +1,14 @@
+PN: base-files
+PV: 3.0.14
+PR: r0
+PKGV: 3.0.14
+PKGR: r0
+LICENSE: GPL-2.0-only
+DESCRIPTION: The base-files package creates the basic system directory structure and provides a small set of key configuration files for the system.
+SUMMARY: Miscellaneous files for the base system
+SECTION: base
+PKG:base-files: base-files
+FILES:base-files: /
+CONFFILES:base-files: /etc/fstab /etc/hostname /etc/hosts /etc/shells /etc/motd /etc/nsswitch.conf /etc/profile
+FILES_INFO:base-files: {"/etc/fstab": 650, "/etc/host.conf": 26, "/etc/hostname": 11, "/etc/hosts": 235, "/etc/issue": 52, "/etc/issue.net": 49, "/etc/motd": 197, "/etc/mtab": 12, "/etc/nsswitch.conf": 465, "/etc/profile": 1937, "/etc/shells": 42, "/etc/skel/.bashrc": 410, "/etc/skel/.profile": 241, "/var/lock": 11}
+PKGSIZE:base-files: 4338
