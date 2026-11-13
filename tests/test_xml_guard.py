@@ -141,7 +141,7 @@ def test_counter_check_the_safe_way_passes() -> None:
 def test_only_xmlsafe_imports_an_xml_parser() -> None:
     offenders: dict[str, list[str]] = {}
     for p in sorted(SRC.rglob("*.py")):
-        rel = str(p.relative_to(SRC))
+        rel = p.relative_to(SRC).as_posix()  # "core/xmlsafe.py" on Windows too
         if rel == "core/xmlsafe.py":
             continue
         hits = banned_xml_imports(p.read_text(encoding="utf-8"))

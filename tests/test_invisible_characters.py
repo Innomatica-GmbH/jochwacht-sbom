@@ -11,6 +11,7 @@ the reason.
 from __future__ import annotations
 
 import subprocess
+import sys
 import unicodedata
 from pathlib import Path
 
@@ -138,7 +139,7 @@ def test_every_exception_is_still_needed() -> None:
 
 def test_git_is_asked_with_safe_directory(tmp_path: Path,
                                          monkeypatch: pytest.MonkeyPatch) -> None:
-    import tests.test_invisible_characters as me
+    me = sys.modules[__name__]
 
     (tmp_path / ".git").mkdir()
     monkeypatch.setattr(me, "ROOT", tmp_path)
@@ -156,7 +157,7 @@ def test_git_is_asked_with_safe_directory(tmp_path: Path,
 
 def test_a_failing_git_fails_loudly_with_code_and_stderr(
         tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    import tests.test_invisible_characters as me
+    me = sys.modules[__name__]
 
     (tmp_path / ".git").mkdir()
     monkeypatch.setattr(me, "ROOT", tmp_path)
@@ -174,7 +175,7 @@ def test_without_git_the_whole_tree_is_read(tmp_path: Path,
                                             monkeypatch: pytest.MonkeyPatch) -> None:
     """A tree from git archive has no .git: every file outside caches and
     virtual environments is read."""
-    import tests.test_invisible_characters as me
+    me = sys.modules[__name__]
 
     (tmp_path / "src").mkdir()
     (tmp_path / "src" / "a.py").write_text("x = 1\n", encoding="utf-8")
