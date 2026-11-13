@@ -132,10 +132,15 @@ jochwacht-sbom status --wait 600                 # 0 green/yellow/waiting for a 
   default (Buildroot's own version, Yocto's PV "1.0"). The output names where
   the label came from; without any, nothing is sent. The label is the version
   in the upload; the local bill keeps the version the build states and
-  carries a differing label beside it. The same label replaces the previous version of that
-  release; a new label is a new release with a full check. When the releases
-  of your subscription are used up, the oldest fully checked one goes into
-  watch, and you get a mail.
+  carries a differing label beside it. The same label replaces the previous
+  version of that release; a new label is a new release with a full check.
+  When the releases of your subscription are used up, the oldest fully checked
+  one goes into watch, and you get a mail.
+- In CI, name the release with `--release` in the pipeline (for example your
+  tag). The derived label is meant for work on your own machine: it comes from
+  the scanned content, so a folder you do not control (a pull request from a
+  fork, an unpacked archive) would choose it, and the same label replaces the
+  previous version of that release.
 - The answer of the send is kept in `.jochwacht/last-upload.json` (without the
   key). `status` must run in the same directory, or get `--status-href`.
 - `status` asks again while the comparison still runs (`--wait`, seconds) and

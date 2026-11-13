@@ -165,3 +165,15 @@ def test_the_local_bill_keeps_the_version_the_build_states(
     assert (meta["name"], meta["version"]) == ("core-image-minimal", "1.0")
     assert {"name": "jochwacht:release-label", "value": "7.7.7"} in meta["properties"]
     assert json.loads(calls[0]["sbom"])["metadata"]["component"]["version"] == "7.7.7"
+
+
+def test_the_help_and_readme_say_to_name_the_release_in_ci() -> None:
+    """sicherheit-2 on 442837e: a derived label comes from the scanned
+    content; in CI --release is the safe way, said where people read."""
+    res = CliRunner().invoke(main, ["--help"])
+    help_text = " ".join(res.output.split())
+    assert "In CI name it here" in help_text and "your own machine" in help_text
+    readme = " ".join((Path(__file__).resolve().parents[1] / "README.md")
+                      .read_text(encoding="utf-8").split())
+    assert "In CI, name the release with `--release` in the pipeline" in readme
+    assert "meant for work on your own machine" in readme

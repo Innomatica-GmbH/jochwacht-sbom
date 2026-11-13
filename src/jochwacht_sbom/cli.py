@@ -73,9 +73,11 @@ _stdout = SafeConsole(soft_wrap=True)
     default=lambda: os.environ.get(api.RELEASE_ENV, ""),
     show_default="JOCHWACHT_RELEASE",
     help="The release of the product version you send (for example 1.4.2), at most "
-    "100 characters; needed for --send. A new label is a new release with a full "
-    "check, the same label replaces its previous version. Written as the version "
-    "into the local bill and the upload.",
+    "100 characters. A new label is a new release with a full check, the same label "
+    "replaces its previous version. In CI name it here (for example your tag). "
+    "Without it the label comes from the git tag on the current commit or the "
+    "product version a build states, else nothing is sent; that derivation is meant "
+    "for work on your own machine, because it comes from the scanned content.",
 )
 @click.option(
     "--no-send",
