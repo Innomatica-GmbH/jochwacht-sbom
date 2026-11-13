@@ -637,10 +637,12 @@ def _run(  # noqa: PLR0913 — mirrors the CLI surface
     # --- The send path: show what leaves the house, then ask -------------
     # The upload is the slim copy (0.20): the build evidence stays local. It is
     # written first, so the customer can open exactly what is sent.
+    from jochwacht_sbom.safe_write import ensure_folder, write_file
+
     upload_copy = path / ".jochwacht" / "sent.cdx.json"
-    upload_copy.parent.mkdir(parents=True, exist_ok=True)
-    upload_copy.write_bytes(slim_bytes(components, stats, project_name=path.resolve().name,
-                                       spec_version=spec_version))
+    ensure_folder(upload_copy.parent)  # never through a symbolic link (sicherheit-2, S1)
+    write_file(upload_copy, slim_bytes(components, stats, project_name=path.resolve().name,
+                                       spec_version=spec_version), fresh=True)
     n_sent = len([c for c in components if c.delivered_image is None])
     if not assume_yes:
         _print_leaving_summary(upload_copy, n_sent, api_base, product)

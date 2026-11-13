@@ -323,6 +323,14 @@ def write_cyclonedx(
 
     Returns the path written.
     """
+    from jochwacht_sbom.safe_write import write_file
+
+    if path.is_symlink():  # a dangling link would create a file elsewhere (S2)
+        raise JochwachtError(
+            f"{path} is a symbolic link; the bill is not written through it. Remove "
+            f"the link, or write the bill elsewhere with --sbom PATH.",
+            exit_code=1,
+        )
     kind = classify_existing(path)
     if kind == "foreign":
         raise JochwachtError(
@@ -333,7 +341,5 @@ def write_cyclonedx(
     doc = build_cyclonedx(
         components, stats, project_name=project_name, spec_version=spec_version,
     )
-    path.write_text(
-        json.dumps(doc, indent=2, ensure_ascii=False) + "\n", encoding="utf-8",
-    )
+    write_file(path, (json.dumps(doc, indent=2, ensure_ascii=False) + "\n").encode("utf-8"))
     return path

@@ -355,10 +355,12 @@ def wait_for_status(
 
 def save_last_upload(project_dir: Path, base: str, answer: dict[str, Any]) -> Path:
     """Keep the upload answer for a later ``jochwacht-sbom status`` — never the key."""
+    from jochwacht_sbom.safe_write import ensure_folder, write_file
+
     where = project_dir / LAST_UPLOAD
-    where.parent.mkdir(parents=True, exist_ok=True)
-    where.write_text(json.dumps({"api_url": base, "answer": answer}, indent=2) + "\n",
-                     encoding="utf-8")
+    ensure_folder(where.parent)  # never through a symbolic link (sicherheit-2, S2)
+    write_file(where, (json.dumps({"api_url": base, "answer": answer}, indent=2)
+                       + "\n").encode("utf-8"))
     return where
 
 
