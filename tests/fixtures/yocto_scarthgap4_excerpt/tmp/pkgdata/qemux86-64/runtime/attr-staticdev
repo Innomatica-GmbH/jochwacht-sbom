@@ -1,0 +1,14 @@
+PN: attr
+PV: 2.5.1
+PR: r0
+PKGV: 2.5.1
+PKGR: r0
+LICENSE: LGPL-2.1-or-later & GPL-2.0-or-later
+DESCRIPTION:attr-staticdev: Implement the ability for a user to attach name:value pairs to objects within the XFS filesystem.  This package contains static libraries for software development.
+SUMMARY:attr-staticdev: Utilities for manipulating filesystem extended attributes - Development files (Static Libraries)
+RDEPENDS:attr-staticdev: attr-dev (= 2.5.1-r0)
+SECTION:attr-staticdev: devel
+PKG:attr-staticdev: attr-staticdev
+FILES:attr-staticdev: /usr/lib/*.a /lib/*.a /usr/lib/attr/*.a
+FILES_INFO:attr-staticdev: {}
+PKGSIZE:attr-staticdev: 0

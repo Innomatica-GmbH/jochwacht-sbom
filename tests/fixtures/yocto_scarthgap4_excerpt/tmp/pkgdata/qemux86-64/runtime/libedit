@@ -1,0 +1,20 @@
+PN: libedit
+PV: 20230828-3.1
+PR: r1
+PKGV: 20230828-3.1
+PKGR: r1
+LICENSE: BSD-3-Clause
+DESCRIPTION: Command line editor library providing generic line editing, history, and tokenization functions
+SUMMARY: BSD replacement for libreadline
+RDEPENDS:libedit: glibc (>= 2.39+git0+be1e627cd7) ncurses-libncurses (>= 6.4) ncurses-libtinfo (>= 6.4)
+RPROVIDES:libedit:  libedit (=20230828-3.1)
+SECTION: libs
+PKG:libedit: libedit0
+FILES:libedit: /usr/bin/* /usr/sbin/* /usr/libexec/* /usr/lib/lib*.so.*             /etc /com /var             /bin/* /sbin/*             /lib/*.so.*             /lib/udev /usr/lib/udev             /lib/udev /usr/lib/udev             /usr/share/libedit /usr/lib/libedit/*             /usr/share/pixmaps /usr/share/applications             /usr/share/idl /usr/share/omf /usr/share/sounds             /usr/lib/bonobo/servers
+FILES_INFO:libedit: {"/usr/lib/libedit.so.0": 17, "/usr/lib/libedit.so.0.0.72": 227456}
+pkg_postinst:libedit: #!/bin/sh\nset -e\nif [ x"$D" = "x" ]; then\n\tif [ -x /sbin/ldconfig ]; then /sbin/ldconfig ; fi\nfi\n
+FILERPROVIDESFLIST:libedit: /usr/lib/libedit.so.0.0.72
+FILERPROVIDES:/usr/lib/libedit.so.0.0.72:libedit:  libedit.so.0()(64bit)
+FILERDEPENDSFLIST:libedit: /usr/lib/libedit.so.0.0.72
+FILERDEPENDS:/usr/lib/libedit.so.0.0.72:libedit:  libc.so.6(GLIBC_2.3)(64bit) libc.so.6(GLIBC_2.11)(64bit) libc.so.6(GLIBC_2.38)(64bit) libc.so.6(GLIBC_2.14)(64bit) libc.so.6(GLIBC_2.33)(64bit) libc.so.6(GLIBC_2.4)(64bit) libc.so.6(GLIBC_2.17)(64bit) libc.so.6(GLIBC_2.3.4)(64bit) libc.so.6(GLIBC_2.2.5)(64bit) libncurses.so.5()(64bit) libtinfo.so.5()(64bit) libc.so.6()(64bit) rtld(GNU_HASH)
+PKGSIZE:libedit: 227473

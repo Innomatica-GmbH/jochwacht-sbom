@@ -1,0 +1,17 @@
+{
+ "DEPLOY_DIR_IMAGE": "tmp/deploy/images/qemux86-64",
+ "DEPLOY_DIR_IPK": "tmp/deploy/ipk",
+ "DEPLOY_DIR_RPM": "tmp/deploy/rpm",
+ "IMAGE_BASENAME": "core-image-minimal",
+ "IMAGE_FSTYPES": " tar.bz2 ext4",
+ "IMAGE_LINK_NAME": "core-image-minimal-qemux86-64.rootfs",
+ "IMAGE_NAME": "core-image-minimal-qemux86-64.rootfs-20261113162618",
+ "IMAGE_PKGTYPE": "rpm",
+ "KERNEL_IMAGETYPE": "bzImage",
+ "MACHINE": "qemux86-64",
+ "PACKAGE_CLASSES": "package_rpm package_ipk",
+ "PKGDATA_DIR": "tmp/pkgdata/qemux86-64",
+ "PREFERRED_PROVIDER_virtual/kernel": "linux-yocto",
+ "PV": "1.0",
+ "TMPDIR": "tmp"
+}
