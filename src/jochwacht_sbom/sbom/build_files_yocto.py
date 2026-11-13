@@ -142,12 +142,51 @@ def rpm_identity(path: Path) -> RpmIdentity:
         raise ValueError(f"RPM header lacks tag {exc}") from exc
 
 
+def _within(path: Path, root: Path) -> bool:
+    """*path* resolves to a place inside *root* (review suite-c, Y1: no root
+    of the reading may be a link out of the build directory)."""
+    try:
+        return path.resolve(strict=True).is_relative_to(root.resolve(strict=True))
+    except (OSError, RuntimeError):
+        return False
+
+
 def _tmp_dir(build_dir: Path) -> Path | None:
-    """The bitbake TMPDIR: *build_dir*/tmp, or *build_dir* itself."""
+    """The bitbake TMPDIR: *build_dir*/tmp, or *build_dir* itself.
+
+    Only inside *build_dir*: a ``tmp`` that is a link elsewhere is not read
+    (a TMPDIR on another disk is named as the build directory itself).
+    """
     for candidate in (build_dir / "tmp", build_dir):
-        if (candidate / "deploy").is_dir() and (candidate / "pkgdata").is_dir():
+        if (candidate / "deploy").is_dir() and (candidate / "pkgdata").is_dir() \
+                and _within(candidate, build_dir) and _within(candidate / "deploy", candidate) \
+                and _within(candidate / "pkgdata", candidate):
             return candidate
     return None
+
+
+#: Roots of the reading below TMPDIR (globs), checked for links out of it.
+_ROOTS = ("deploy", "pkgdata", "deploy/images", "deploy/images/*", "pkgdata/*",
+          "pkgdata/*/runtime", "deploy/spdx", "deploy/rpm", "deploy/ipk", "deploy/deb")
+
+
+def outside_roots(build_dir: Path) -> list[str]:
+    """Warnings for every root of the reading that points outside the build
+    directory and is therefore not read — named, not dropped silently."""
+    out: list[str] = []
+    for tmp in (build_dir / "tmp", build_dir):
+        if tmp.exists() and tmp != build_dir and not _within(tmp, build_dir):
+            out.append(f"{tmp.name} points outside the build directory; not read")
+            continue
+        if not (tmp / "deploy").exists() and not (tmp / "pkgdata").exists():
+            continue
+        for pattern in _ROOTS:
+            for root in sorted(tmp.glob(pattern)):
+                if root.exists() and not _within(root, tmp):
+                    out.append(f"{root.relative_to(build_dir).as_posix()} points outside "
+                               "the build directory; not read")
+        break
+    return out
 
 
 def _image_statements(tmp: Path) -> tuple[set[str], set[str]]:
@@ -236,7 +275,7 @@ def _runtime_dirs(tmp: Path, stated: set[str]) -> list[Path]:
         dirs = [pkgdata / name / "runtime" for name in sorted(stated)]
     else:
         dirs = sorted(pkgdata.glob("*/runtime"))
-    return [d for d in dirs if d.is_dir() and not d.is_symlink()]
+    return [d for d in dirs if d.is_dir() and not d.is_symlink() and _within(d, tmp)]
 
 
 def yocto_feed_evidence(build_dir: Path) -> dict[str, ComponentEvidence]:
@@ -258,6 +297,8 @@ def yocto_feed_evidence(build_dir: Path) -> dict[str, ComponentEvidence]:
         logger.warning("Yocto evidence: feed type %s is not read yet", feed)
         return {}
     feed_root = tmp / "deploy" / _FEED_DIRS[feed]
+    if not _within(feed_root, tmp):
+        return {}
     runtime_dirs = _runtime_dirs(tmp, stated_pkgdata)
     if not runtime_dirs:
         return {}
@@ -336,6 +377,8 @@ def _stated_images(tmp: Path) -> list[_Image]:
     for testdata in sorted(images.glob("*/*.testdata.json")):
         if testdata.is_symlink():
             continue  # the IMAGE_LINK_NAME alias of a dated file
+        if not _within(testdata.parent, tmp):
+            continue  # a machine folder linked from elsewhere (named by outside_roots)
         try:
             data = json.loads(testdata.read_text(encoding="utf-8"))
         except (OSError, ValueError):
@@ -574,7 +617,7 @@ def _manifest_paths(tmp: Path) -> list[Path]:
         folder = tmp / "deploy" / "images"
         paths = sorted(p for p in folder.glob("*/*.manifest")
                        if p.is_file() and not p.is_symlink()) if folder.is_dir() else []
-    return paths
+    return [p for p in paths if _within(p, tmp)]
 
 
 def yocto_manifest_entries(build_dir: Path) -> list[tuple[str, str]]:
@@ -684,7 +727,7 @@ def _recipe_homepages(tmp: Path) -> dict[str, tuple[str, list[str]]]:
     (``SPDXRef-Download-*`` packages: SRC_URI as the build resolved it)."""
     out: dict[str, tuple[str, list[str]]] = {}
     spdx = tmp / "deploy" / "spdx"
-    if not spdx.is_dir():
+    if not spdx.is_dir() or not _within(spdx, tmp):
         return out
     for path in sorted(spdx.rglob("recipe-*.spdx.json")):
         if path.is_symlink() or not path.is_file():
@@ -833,7 +876,7 @@ def yocto_build(build_dir: Path, names: list[str]) -> YoctoBuildEvidence:
     excluded, without a readable rootfs no file is proven (``not_evidenced``
     stays ""), without a recipe document no creator is said.
     """
-    warnings: list[str] = []
+    warnings: list[str] = outside_roots(build_dir)
     sources: list[str] = []
     try:
         shipped = yocto_image_packages(build_dir)
