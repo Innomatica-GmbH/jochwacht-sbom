@@ -146,3 +146,79 @@ def test_two_builds_name_no_product(scanned: Path, tmp_path: Path) -> None:
     components, stats = collect_components(scanned)
     meta = build_cyclonedx(components, stats, project_name="project")["metadata"]["component"]
     assert (meta["name"], meta["version"]) == ("project", "unspecified")
+
+
+@pytest.mark.skipif(__import__("sys").platform == "win32",
+                    reason="symbolic links need privileges on Windows")
+def test_y1_a_root_linked_out_of_the_build_is_named(scanned: Path, tmp_path: Path) -> None:
+    """suite-c Y1 (shared core): a root of the reading that is a link out of
+    the build directory is not read; the collector names it in the summary."""
+    import os
+
+    from click.testing import CliRunner
+
+    from jochwacht_sbom.cli import main
+
+    rpm = scanned / "build" / "tmp" / "deploy" / "rpm"
+    outside = tmp_path / "elsewhere" / "rpm"
+    shutil.move(str(rpm), str(outside))
+    os.symlink(outside, rpm)
+    _, stats = collect_components(scanned)
+    assert any("deploy/rpm points outside the build directory" in w
+               for w in stats.build_warnings), stats.build_warnings
+    res = CliRunner().invoke(main, [str(scanned)])
+    assert res.exit_code == 0, res.output
+    assert "points outside the build directory" in " ".join(res.output.split())
+
+
+@pytest.mark.skipif(__import__("sys").platform == "win32",
+                    reason="symbolic links need privileges on Windows")
+@pytest.mark.parametrize("rel", [
+    "tmp", "tmp/deploy", "tmp/deploy/images", "tmp/deploy/images/qemux86-64", "tmp/pkgdata",
+])
+def test_a_build_part_linked_outside_is_named_never_read(
+    scanned: Path, tmp_path: Path, rel: str,
+) -> None:
+    """sicherheit-2 on 31735f7: with tmp, deploy, images or the machine folder
+    a link out of the scanned folder, the Yocto build fell away silently (1
+    instead of 37 components, no line). Nothing is read from outside, and the
+    customer is told which link was not followed."""
+    import os
+
+    from click.testing import CliRunner
+
+    from jochwacht_sbom.cli import main
+
+    inside = scanned / "build" / rel
+    outside = tmp_path / "elsewhere" / Path(rel).name
+    outside.parent.mkdir()
+    shutil.move(str(inside), str(outside))
+    os.symlink(outside, inside)
+    components, stats = collect_components(scanned)
+    assert not any(c.delivered_files for c in components)  # nothing read from outside
+    # the core names a root it would read (relative to TMPDIR, prefixed with
+    # the build); the collector names a part that hides the whole build
+    expected = ("Yocto build at build/tmp: pkgdata points outside" if rel == "tmp/pkgdata"
+                else f"Yocto build part build/{rel} points outside")
+    assert any(expected in w for w in stats.build_warnings), stats.build_warnings
+    res = CliRunner().invoke(main, [str(scanned)])
+    # nothing read is exit 2 (no build found), the found build with an
+    # outside root exit 0; both say which link was not followed
+    assert res.exit_code == (0 if rel == "tmp/pkgdata" else 2), res.output
+    assert expected in " ".join(res.output.split())
+
+
+@pytest.mark.skipif(__import__("sys").platform == "win32",
+                    reason="symbolic links need privileges on Windows")
+def test_an_unrelated_link_out_is_not_called_a_yocto_build(tmp_path: Path) -> None:
+    import os
+
+    proj = tmp_path / "proj"
+    (proj / "conf").mkdir(parents=True)
+    (proj / "requirements.txt").write_text("requests==2.31.0\n", encoding="utf-8")
+    (tmp_path / "scratch").mkdir()
+    os.symlink(tmp_path / "scratch", proj / "tmp")
+    (tmp_path / "pics" / "images").mkdir(parents=True)
+    os.symlink(tmp_path / "pics" / "images", proj / "images")
+    _, stats = collect_components(proj)
+    assert stats.build_warnings == []

@@ -430,6 +430,12 @@ def _run(  # noqa: PLR0913 — mirrors the CLI surface
     real = [c for c in components if not c.condition]
     conditional = [c for c in components if c.condition]
 
+    for warning in stats.build_warnings:
+        # What a build directory could not prove is said, never only logged
+        # (SY1), also when nothing else was found: a Yocto build behind a
+        # link out of the folder must not vanish without a word.
+        console.print(f"[yellow]Build directory:[/yellow] {fg(warning)}", soft_wrap=True)
+
     if not real:
         # An empty report is the worst possible answer — but WHY it is empty
         # differs, and telling a CMake customer "no build system found" when
@@ -525,9 +531,6 @@ def _run(  # noqa: PLR0913 — mirrors the CLI surface
         )
     for src in stats.build_output_sources:
         console.print(f"[dim]Build output: {fg(src)}[/dim]")
-    for warning in stats.build_warnings:
-        # what the build could not prove is said, never only logged (SY1)
-        console.print(f"[yellow]Build directory:[/yellow] {fg(warning)}", soft_wrap=True)
     if stats.buildroot_source_skipped:
         # Buildroot's own tooling (kconfig, utils/) is not the product: named,
         # never silent (suite-c, Abweichung 3).

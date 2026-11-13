@@ -237,6 +237,51 @@ def _buildroot_build_components(
     return out
 
 
+def _yocto_part(entry: Path) -> bool:
+    """Whether a directory link stands where a Yocto build keeps what the
+    reader needs: TMPDIR, its deploy/, deploy/images/ or a machine folder.
+    Only names and existence are looked at, nothing outside is read."""
+    parent = entry.parent
+    if entry.name == "tmp":
+        return (entry / "deploy").is_dir()
+    if entry.name == "deploy":
+        return (parent / "pkgdata").is_dir() or (entry / "images").is_dir()
+    if entry.name == "images":
+        return parent.name == "deploy"
+    return parent.name == "images" and parent.parent.name == "deploy"
+
+
+def _yocto_links_outside(path: Path, *, max_depth: int) -> list[str]:
+    """Yocto build parts under *path* that are links out of it (sicherheit-2
+    on 31735f7): the finder does not follow them, so the build fell away
+    without a word. Named here; never read. The walk is find_build_output's."""
+    root = path.resolve()
+    found: list[str] = []
+
+    def walk(current: Path, depth: int) -> None:
+        if depth > max_depth:
+            return
+        try:
+            entries = sorted(current.iterdir())
+        except OSError:
+            return
+        for entry in entries:
+            if entry.name.startswith(".") or entry.name in ("sources", "host-sources",
+                                                            "legal-info"):
+                continue
+            if entry.is_symlink():
+                if entry.is_dir() and not _below_any(entry, (root,)) and _yocto_part(entry):
+                    rel = entry.relative_to(path).as_posix()
+                    found.append(f"Yocto build part {rel} points outside the scanned "
+                                 "folder; not read")
+                continue
+            if entry.is_dir():
+                walk(entry, depth + 1)
+
+    walk(path, 0)
+    return found
+
+
 def _yocto_build_components(
     path: Path, record_failure: Any, warnings: list[str], read_roots: list[Path],
     products: list[tuple[str, str]],
@@ -263,7 +308,8 @@ def _yocto_build_components(
     for read in reads:
         build = read.build
         read_roots.append(read.tmp_dir.resolve())
-        warnings.extend(build.warnings)
+        where = os.path.relpath(read.tmp_dir, path)
+        warnings.extend(f"Yocto build at {Path(where).as_posix()}: {w}" for w in build.warnings)
         products.append((build.product_name, build.product_version))
         for (raw_name, raw_version), entry in zip(read.packages, build.entries, strict=True):
             name, version = clean(raw_name), clean(raw_version)
@@ -633,6 +679,7 @@ def collect_components(
     # packages replace the *.rootfs.manifest rows of the same build.
     yocto_comps = _yocto_build_components(path, record_failure, build_warnings,
                                           replaced_roots, products)
+    build_warnings.extend(_yocto_links_outside(path, max_depth=max_depth))
 
     # Path 3: Yocto/Buildroot BUILD OUTPUT — what is actually in the
     # customer's image (run the check in the build directory).
