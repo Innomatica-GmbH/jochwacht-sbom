@@ -69,6 +69,15 @@ _stdout = SafeConsole(soft_wrap=True)
     "exist in the portal: the upload never creates one.",
 )
 @click.option(
+    "--release",
+    default=lambda: os.environ.get(api.RELEASE_ENV, ""),
+    show_default="JOCHWACHT_RELEASE",
+    help="The release of the product version you send (for example 1.4.2), at most "
+    "100 characters; needed for --send. A new label is a new release with a full "
+    "check, the same label replaces its previous version. Written as the version "
+    "into the local bill and the upload.",
+)
+@click.option(
     "--no-send",
     "never_send",
     is_flag=True,
@@ -158,6 +167,7 @@ def main(  # noqa: PLR0913 — CLI surface, mirrors documented flags
     path: Path,
     send: bool,
     product: str,
+    release: str,
     never_send: bool,
     assume_yes: bool,
     sbom_path: Path | None,
@@ -189,6 +199,7 @@ def main(  # noqa: PLR0913 — CLI surface, mirrors documented flags
             path=path,
             send=send,
             product=product,
+            release=release,
             never_send=never_send,
             assume_yes=assume_yes,
             sbom_path=sbom_path,
@@ -307,6 +318,7 @@ def _run(  # noqa: PLR0913 — mirrors the CLI surface
     path: Path,
     send: bool = False,
     product: str = "",
+    release: str = "",
     never_send: bool = False,
     assume_yes: bool = False,
     sbom_path: Path | None = None,
@@ -339,6 +351,17 @@ def _run(  # noqa: PLR0913 — mirrors the CLI surface
         )
         sys.exit(1)
     uploading = send and not dry_run and output is None
+    # The release label is checked before anything is read or written: a bad
+    # one would only be refused by the server (contract of 27), and without
+    # one the upload is certain to be refused (release_label_missing).
+    label = api.check_release(release)
+    if uploading and not label:
+        console.print(
+            f"[red]Error:[/red] --send needs the release of this version: name it with "
+            f"--release (for example 1.4.2) or {api.RELEASE_ENV}. Nothing was sent.",
+            soft_wrap=True,
+        )
+        sys.exit(1)
     if uploading:
         gone = [flag for flag, value in (("--email", contact_email), ("--voucher", voucher),
                                          ("--code", code), ("--url", url != DEFAULT_SUBMIT_URL))
@@ -637,6 +660,7 @@ def _run(  # noqa: PLR0913 — mirrors the CLI surface
         stats,
         project_name=path.resolve().name,
         spec_version=spec_version,
+        release=label,
     )
     path_arg = "." if path.resolve() == Path.cwd().resolve() else str(path)
 
@@ -654,7 +678,7 @@ def _run(  # noqa: PLR0913 — mirrors the CLI surface
     upload_copy = path / ".jochwacht" / "sent.cdx.json"
     ensure_folder(upload_copy.parent)  # never through a symbolic link (sicherheit-2, S1)
     write_file(upload_copy, slim_bytes(components, stats, project_name=path.resolve().name,
-                                       spec_version=spec_version), fresh=True)
+                                       spec_version=spec_version, release=label), fresh=True)
     n_sent = len([c for c in components if c.delivered_image is None])
     if not assume_yes:
         _print_leaving_summary(upload_copy, n_sent, api_base, product)
@@ -668,7 +692,8 @@ def _run(  # noqa: PLR0913 — mirrors the CLI surface
             # that hangs or fails there, but a line that says so
             # --yes stays for a terminal.
             console.print("sending without confirmation (no terminal)")
-    answer = api.Client(api_base, api_key).upload(upload_copy.read_bytes(), product=product)
+    answer = api.Client(api_base, api_key).upload(upload_copy.read_bytes(), product=product,
+                                                  release=label)
     if assume_yes:
         # --yes asks nothing, but still says which file left the house.
         console.print(
@@ -680,6 +705,15 @@ def _run(  # noqa: PLR0913 — mirrors the CLI surface
         f"[green]Sent.[/green] {fg(str(state))}: version {fg(str(answer.get('version', '?')))} "
         f"of {fg(str(answer.get('product', product or '?')))}, "
         f"{fg(str(answer.get('components', n_sent)))} components.",
+        soft_wrap=True,
+    )
+    # contract of 27: the release the version belongs to, and whether it is
+    # fully checked or, with the quota full, only watched
+    mode = {"full": "full check", "watch": "watch only"}.get(str(answer.get("mode", "")), "")
+    console.print(
+        f"Release {fg(str(answer.get('label') or label))}"
+        + (f" ({fg(str(answer['release']))})" if answer.get("release") else "")
+        + (f": {mode}." if mode else "."),
         soft_wrap=True,
     )
     href = answer.get("status_href")

@@ -131,7 +131,8 @@ def test_send_uploads_the_slim_copy_it_shows(tmp_path: Path, monkeypatch: Any) -
     root = _tree(tmp_path)
     sent: list[bytes] = []
 
-    def fake_upload(self: Any, sbom: bytes, *, product: str) -> dict[str, Any]:
+    def fake_upload(self: Any, sbom: bytes, *, product: str,
+                    release: str = "") -> dict[str, Any]:
         sent.append(sbom)
         return {"status": "accepted"}
 
@@ -245,7 +246,7 @@ def test_send_with_yes_still_names_the_copy_it_uploads(tmp_path: Path, monkeypat
 
     root = _tree(tmp_path)
     monkeypatch.setattr(api.Client, "upload",
-                        lambda self, sbom, *, product: {"status": "accepted"})
+                        lambda self, sbom, *, product, release="": {"status": "accepted"})
     monkeypatch.setenv("JOCHWACHT_API_KEY", "jw_test_" + "x" * 32)
     res = CliRunner().invoke(main, [str(root), "--send", "--yes"])
     assert res.exit_code == 0, res.output

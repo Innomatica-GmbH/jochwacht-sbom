@@ -37,7 +37,7 @@ def _project(tmp_path: Path) -> tuple[Path, Path]:
 
 
 def _send(proj: Path, monkeypatch: Any) -> Any:
-    monkeypatch.setattr(api.Client, "upload", lambda self, sbom, *, product: {"status": "ok"})
+    monkeypatch.setattr(api.Client, "upload", lambda self, sbom, **_: {"status": "ok"})
     monkeypatch.setenv("JOCHWACHT_API_KEY", "jw_test_" + "x" * 32)
     return CliRunner().invoke(main, [str(proj), "--send", "--yes"])
 

@@ -59,7 +59,7 @@ def test_send_happy_path_names_the_version(
     environment); the answer names the version."""
     from jochwacht_sbom import api
 
-    monkeypatch.setattr(api.Client, "upload", lambda self, sbom, *, product: _answer())
+    monkeypatch.setattr(api.Client, "upload", lambda self, sbom, *, product, release="": _answer())
     monkeypatch.setenv("JOCHWACHT_API_KEY", _KEY)
     result = CliRunner().invoke(check_cli.main, [str(demo_project), "--send", "--yes"])
     assert result.exit_code == 0, result.stderr
@@ -110,7 +110,7 @@ def test_upload_error_maps_to_exit_1(
 ) -> None:
     from jochwacht_sbom import api
 
-    def _boom(self: object, sbom: bytes, *, product: str) -> dict[str, object]:
+    def _boom(self: object, sbom: bytes, *, product: str, release: str = "") -> dict[str, object]:
         raise api.ApiError("endpoint down")
 
     monkeypatch.setattr(api.Client, "upload", _boom)

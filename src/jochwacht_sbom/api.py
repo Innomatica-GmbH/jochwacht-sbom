@@ -36,6 +36,8 @@ DEFAULT_API_URL = "https://api.jochwacht.dev"
 KEY_ENV = "JOCHWACHT_API_KEY"
 URL_ENV = "JOCHWACHT_API_URL"
 PRODUCT_ENV = "JOCHWACHT_PRODUCT"
+#: The release label of the version sent (contract of 27, X-Release, §7.1).
+RELEASE_ENV = "JOCHWACHT_RELEASE"
 UPLOAD_PATH = "/api/v1/subscriptions/sbom-versions"
 #: The product's current version, named like the upload names it (§16.3).
 CURRENT_STATUS_PATH = "/api/v1/subscriptions/sbom-versions/status"
@@ -52,6 +54,8 @@ _KEY_FORM = re.compile(r"[\x21-\x7e]+")
 _NAME_FORBIDDEN = frozenset({"Cc", "Cf", "Zl", "Zp", "Cs"})
 #: Longest product name the API takes (contract §7.1, product_name_invalid).
 _PRODUCT_NAME_MAX = 200
+#: Longest release label the API takes (release_label_invalid); never shortened.
+_RELEASE_LABEL_MAX = 100
 
 #: How many reachable products a "product_required" answer names at most.
 _PRODUCTS_SHOWN = 10
@@ -108,6 +112,25 @@ def check_product(product: str) -> str:
     return name
 
 
+def check_release(label: str) -> str:
+    """The release label without blanks at the edges, "" when none. It goes into
+    the X-Release header as UTF-8 bytes; a line break, a control or an invisible
+    character, or more than 100 characters, is refused before any request:
+    the server would refuse it (release_label_invalid) and a label is never
+    shortened (contract of 27)."""
+    name = label.strip(" \t")
+    if any(unicodedata.category(c) in _NAME_FORBIDDEN for c in name):
+        msg = ("The release label holds a line break, a control or an invisible "
+               "character; write it again in --release or " + RELEASE_ENV + ".")
+        raise ApiError(msg)
+    if len(name) > _RELEASE_LABEL_MAX:
+        msg = (f"The release label is longer than {_RELEASE_LABEL_MAX} characters "
+               f"({len(name)}); it is never shortened. Choose a shorter one in --release "
+               f"or {RELEASE_ENV}.")
+        raise ApiError(msg)
+    return name
+
+
 def _clean(text: object) -> str:
     """A server text for the terminal: control and invisible characters removed."""
     return "".join(c for c in str(text) if unicodedata.category(c) not in _NAME_FORBIDDEN)
@@ -131,6 +154,13 @@ def _upload_refusal(code: str, raw: bytes) -> str:
     if code == "product_unknown":
         return (f"This product does not exist. Create it in the portal, or check the name "
                 f"in --product or {PRODUCT_ENV}.")
+    if code == "release_label_missing":
+        return (f"The release of this version is not named. Name it with --release "
+                f"(for example 1.4.2) or {RELEASE_ENV}.")
+    if code == "release_label_invalid":
+        return (f"The release label is empty after cleaning or longer than "
+                f"{_RELEASE_LABEL_MAX} characters. Choose another in --release or "
+                f"{RELEASE_ENV}.")
     if code == "subscription_inactive":
         return "The subscription is not active. Check it in the portal."
     if code == "product_required":
@@ -220,6 +250,7 @@ class Client:
         self._opener = opener if opener is not None else build_opener()
 
     def _request(self, path: str, *, data: bytes | None = None, product: str = "",
+                 release: str = "",
                  accept: str = "application/json") -> urllib.request.Request:
         headers: dict[str, Any] = {"X-Api-Key": self._key, "Accept": accept,
                                    "User-Agent": f"jochwacht-sbom/{__version__}"}
@@ -228,15 +259,18 @@ class Client:
             # UTF-8 bytes: http.client would encode a str as latin-1 and fail on
             # any other character; the API reads the bytes back (contract of 27).
             headers["X-Product"] = name.encode("utf-8")
+        label = check_release(release)
+        if label:
+            headers["X-Release"] = label.encode("utf-8")
         if data is not None:
             headers["Content-Type"] = "application/vnd.cyclonedx+json"
         return urllib.request.Request(  # noqa: S310 — https checked in api_base
             self.base + path, data=data, headers=headers,
             method="POST" if data is not None else "GET")
 
-    def upload(self, sbom: bytes, *, product: str) -> dict[str, Any]:
+    def upload(self, sbom: bytes, *, product: str, release: str = "") -> dict[str, Any]:
         """POST the SBOM bytes as written (§7.1); the answer of §16.2."""
-        req = self._request(UPLOAD_PATH, data=sbom, product=product)
+        req = self._request(UPLOAD_PATH, data=sbom, product=product, release=release)
         try:
             with self._opener.open(req, timeout=_TIMEOUT_SECONDS) as resp:
                 raw = resp.read()

@@ -202,6 +202,7 @@ def build_cyclonedx(
     project_name: str,
     spec_version: str = SPEC_VERSION,
     full: bool = True,
+    release: str = "",
 ) -> dict[str, object]:
     """Build the CycloneDX document for *components*.
 
@@ -223,12 +224,17 @@ def build_cyclonedx(
             f"Use one of {', '.join(SPEC_VERSIONS)}."
         )
     lifecycle = stats.lifecycle or "design"
-    name, version = project_name, "unspecified"
+    # No "unspecified": the server counts it as no version (contract of 27);
+    # a version is only written when someone states it. The customer's
+    # release label first (their own word, in both bills), else in the local
+    # bill the product version the one build names, as the suite writes it.
+    name, version = project_name, release
     if full and stats.build_product:
-        # The product the one build names, as the suite writes it; the upload
-        # keeps its header (no new field leaves the house).
         name = stats.build_product[0]
-        version = stats.build_product[1] or version
+        version = release or stats.build_product[1]
+    product: dict[str, object] = {"type": "application", "name": name}
+    if version:
+        product["version"] = version
     return {
         "bomFormat": "CycloneDX",
         "specVersion": spec_version,
@@ -247,11 +253,7 @@ def build_cyclonedx(
                     "publisher": "Innomatica GmbH",
                 }],
             },
-            "component": {
-                "type": "application",
-                "name": name,
-                "version": version,
-            },
+            "component": product,
         },
         "components": _components_with_refs(
             components, full=full, creator_ok=spec_version not in ("1.5",)),
@@ -264,6 +266,7 @@ def slim_bytes(
     *,
     project_name: str,
     spec_version: str = SPEC_VERSION,
+    release: str = "",
 ) -> bytes:
     """What ``--send`` uploads: the bill without the build evidence.
 
@@ -273,7 +276,7 @@ def slim_bytes(
     licence and CPE a build proves stay in the local file.
     """
     doc = build_cyclonedx(components, stats, project_name=project_name,
-                          spec_version=spec_version, full=False)
+                          spec_version=spec_version, full=False, release=release)
     return (json.dumps(doc, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
 
 
@@ -317,6 +320,7 @@ def write_cyclonedx(
     *,
     project_name: str,
     spec_version: str = SPEC_VERSION,
+    release: str = "",
 ) -> Path:
     """Write the SBOM to *path*.
 
@@ -346,6 +350,7 @@ def write_cyclonedx(
         )
     doc = build_cyclonedx(
         components, stats, project_name=project_name, spec_version=spec_version,
+        release=release,
     )
     write_file(path, (json.dumps(doc, indent=2, ensure_ascii=False) + "\n").encode("utf-8"))
     return path

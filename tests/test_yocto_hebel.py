@@ -129,7 +129,7 @@ def test_sy1_a_rootfs_over_the_limit_is_said(scanned: Path, monkeypatch: Any) ->
 def test_the_local_bill_names_the_product_the_build_states(scanned: Path) -> None:
     """suite-d's parity finding: the suite writes the image recipe
     (IMAGE_BASENAME, PV of testdata.json) as metadata.component; the collector
-    wrote the folder name and 'unspecified'. The upload keeps its header."""
+    wrote the folder name and a placeholder version. The upload keeps its header."""
     from jochwacht_sbom.yocto_build import read_yocto_builds
 
     (read,) = read_yocto_builds(scanned)
@@ -145,7 +145,8 @@ def test_two_builds_name_no_product(scanned: Path, tmp_path: Path) -> None:
     shutil.copytree(EXCERPT, scanned / "zweiter", symlinks=True)
     components, stats = collect_components(scanned)
     meta = build_cyclonedx(components, stats, project_name="project")["metadata"]["component"]
-    assert (meta["name"], meta["version"]) == ("project", "unspecified")
+    assert meta["name"] == "project"
+    assert "version" not in meta  # never "unspecified" (contract of 27)
 
 
 @pytest.mark.skipif(__import__("sys").platform == "win32",

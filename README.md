@@ -113,8 +113,8 @@ steps of a CI pipeline:
 
 ```bash
 export JOCHWACHT_API_KEY=…            # from a secret of your pipeline, never on the command line
-jochwacht-sbom . --send --yes         # writes sbom.cdx.json and sends it
-jochwacht-sbom status --wait 600      # 0 green/yellow/waiting for a person, 1 red, 2 error
+jochwacht-sbom . --send --yes --release 1.4.2   # writes sbom.cdx.json and sends it
+jochwacht-sbom status --wait 600                 # 0 green/yellow/waiting for a person, 1 red, 2 error
 ```
 
 - The key comes from `JOCHWACHT_API_KEY`, the address from `JOCHWACHT_API_URL`
@@ -124,6 +124,13 @@ jochwacht-sbom status --wait 600      # 0 green/yellow/waiting for a person, 1 r
   `JOCHWACHT_PRODUCT`: its name as in the portal, or its id `prd_…`. The product
   must exist in the portal; the upload never creates one. A key can be limited
   to some products; another product is then refused.
+- `--send` needs the release of the version you send: `--release` or
+  `JOCHWACHT_RELEASE` (for example your tag), at most 100 characters; a longer
+  one is refused, never shortened. It is written as the version into the bill
+  and the upload. The same label replaces the previous version of that
+  release; a new label is a new release with a full check. When the releases
+  of your subscription are used up, the oldest fully checked one goes into
+  watch, and you get a mail.
 - The answer of the send is kept in `.jochwacht/last-upload.json` (without the
   key). `status` must run in the same directory, or get `--status-href`.
 - `status` asks again while the comparison still runs (`--wait`, seconds) and

@@ -297,7 +297,7 @@ def test_send_uploads_the_written_sbom_and_saves_the_answer(
     proj = _project(tmp_path)
     sent: list[bytes] = []
 
-    def upload(self: Client, sbom: bytes, *, product: str) -> dict[str, Any]:
+    def upload(self: Client, sbom: bytes, *, product: str, release: str = "") -> dict[str, Any]:
         sent.append(sbom)
         return {"status": "new", "product": "prd_1", "version": 5, "components": 1,
                 "status_href": HREF}
@@ -454,7 +454,7 @@ def test_without_a_terminal_send_goes_without_a_question(
     from jochwacht_sbom import cli
 
     sent: list[bytes] = []
-    monkeypatch.setattr(Client, "upload", lambda self, sbom, *, product: sent.append(sbom)
+    monkeypatch.setattr(Client, "upload", lambda self, sbom, **_: sent.append(sbom)
                         or {"status": "new", "version": 5, "status_href": HREF})
     monkeypatch.setattr(cli, "_stdin_is_terminal", lambda: False)
     res = CliRunner().invoke(cli.main, [str(_project(tmp_path)), "--send"],
@@ -470,7 +470,7 @@ def test_at_a_terminal_send_asks_and_yes_skips_it(
     from jochwacht_sbom import cli
 
     sent: list[bytes] = []
-    monkeypatch.setattr(Client, "upload", lambda self, sbom, *, product: sent.append(sbom)
+    monkeypatch.setattr(Client, "upload", lambda self, sbom, **_: sent.append(sbom)
                         or {"status": "new", "version": 5, "status_href": HREF})
     monkeypatch.setattr(cli, "_stdin_is_terminal", lambda: True)
     proj = _project(tmp_path)
