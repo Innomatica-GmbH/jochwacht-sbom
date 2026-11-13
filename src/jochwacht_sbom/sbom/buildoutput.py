@@ -140,10 +140,15 @@ def find_build_output(path: Path, *, max_depth: int = 5) -> tuple[list[Path], li
     return manifests, legal_dirs
 
 
-def _stated_names(folder: Path) -> list[str] | None:
-    """IMAGE_NAME of every regular ``*.testdata.json`` in *folder* (the dated
-    file; the undated name is a link), None when there is none."""
-    names: list[str] = []
+def _stated_candidates(folder: Path) -> list[list[str]] | None:
+    """Per regular ``*.testdata.json`` in *folder* (the dated file; the
+    undated name is a link): the candidate names of its manifest, by the one
+    rule of the core (build_files_yocto.image_file_names: IMAGE_MANIFEST,
+    IMAGE_NAME + IMAGE_NAME_SUFFIX, IMAGE_NAME, IMAGE_NAME + ".rootfs").
+    None when no testdata.json states an image."""
+    from jochwacht_sbom.sbom.build_files_yocto import image_file_names
+
+    stated: list[list[str]] = []
     for testdata in sorted(folder.glob("*.testdata.json")):
         if testdata.is_symlink() or not testdata.is_file():
             continue
@@ -151,12 +156,12 @@ def _stated_names(folder: Path) -> list[str] | None:
             if testdata.stat().st_size > MAX_TESTDATA_BYTES:
                 continue
             data = json.loads(testdata.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
+        except (OSError, ValueError, RecursionError):
             continue
-        name = data.get("IMAGE_NAME") if isinstance(data, dict) else None
-        if isinstance(name, str) and name and "/" not in name:
-            names.append(name)
-    return names or None
+        candidates = image_file_names(data, "manifest") if isinstance(data, dict) else []
+        if candidates:
+            stated.append(candidates)
+    return stated or None
 
 
 def stated_image_manifests(manifests: list[Path]) -> tuple[list[Path], list[str]]:
@@ -174,7 +179,7 @@ def stated_image_manifests(manifests: list[Path]) -> tuple[list[Path], list[str]
     selected: list[Path] = []
     notes: list[str] = []
     for folder, found in by_folder.items():
-        stated = _stated_names(folder)
+        stated = _stated_candidates(folder)
         if stated is None:
             selected.extend(found)
             distinct = {p.resolve() for p in found}
@@ -183,14 +188,21 @@ def stated_image_manifests(manifests: list[Path]) -> tuple[list[Path], list[str]
                               f"{_clean(folder.name)} without testdata.json, all read "
                               "(which image is the product is not stated)")
             continue
-        wanted = {f"{name}.manifest" for name in stated}
-        present = {p.name: p for p in found if p.name in wanted and not p.is_symlink()}
-        missing = sorted(wanted - set(present))
+        regular = {p.name: p for p in found if not p.is_symlink()}
+        chosen: list[Path] = []
+        missing = ""
+        for candidates in stated:
+            hit = next((regular[c] for c in candidates if c in regular), None)
+            if hit is None:
+                missing = candidates[0]
+                break
+            if hit not in chosen:
+                chosen.append(hit)
         if missing:
             notes.append(f"skipped yocto image manifests in {_clean(folder.name)}: the stated "
-                         f"image's manifest {_clean(missing[0])} is missing")
+                         f"image's manifest {_clean(missing)} is missing")
             continue
-        selected.extend(present[name] for name in sorted(present))
+        selected.extend(chosen)
     return selected, notes
 
 

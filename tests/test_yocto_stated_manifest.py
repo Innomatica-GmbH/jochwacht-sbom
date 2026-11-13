@@ -101,3 +101,27 @@ def test_b4_nothing_new_leaves_the_house(tmp_path: Path) -> None:
                  payload.model_dump_json()):
         assert "stated image" not in sent and "testdata" not in sent
         assert STAMP not in sent and "qemux86-64" not in sent
+
+
+def test_kirkstone_naming_reads_the_build(tmp_path: Path) -> None:
+    """kirkstone/dunfell: IMAGE_NAME without ".rootfs", the files with it
+    (poky image-artifact-names/rootfs-postcommands, suite-b's review)."""
+    import json
+
+    kirk = "core-image-minimal-qemux86-64-20261113162618"
+    root = _yocto(tmp_path)
+    folder = root / IMAGES
+    for link in ("core-image-minimal-qemux86-64.rootfs.manifest",
+                 "core-image-minimal-qemux86-64.rootfs.testdata.json"):
+        (folder / link).unlink()
+    data = json.loads((folder / f"{STAMP}.testdata.json").read_text(encoding="utf-8"))
+    data["IMAGE_NAME"] = kirk
+    (folder / f"{STAMP}.testdata.json").unlink()
+    (folder / f"{kirk}.testdata.json").write_text(json.dumps(data), encoding="utf-8")
+    (folder / f"{STAMP}.manifest").rename(folder / f"{kirk}.rootfs.manifest")
+    (folder / f"{STAMP}.tar.bz2").rename(folder / f"{kirk}.rootfs.tar.bz2")
+    diagnosis.reset()
+    components, stats = collect_components(root)
+    assert any(c.name == "libc6" for c in components)
+    assert not [f for f in diagnosis.failures() if f.reader == "yocto_build"]
+    assert any(c.delivered_files for c in components)  # the rootfs tar was found

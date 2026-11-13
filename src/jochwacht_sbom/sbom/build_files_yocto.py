@@ -193,7 +193,7 @@ def _image_statements(tmp: Path) -> tuple[set[str], set[str]]:
             continue  # the dated file is read, its 'latest' link would repeat it
         try:
             data = json.loads(testdata.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
+        except (OSError, ValueError, RecursionError):
             continue
         if not isinstance(data, dict):
             continue
@@ -360,6 +360,46 @@ class _Image:
     data: dict[str, object]   # the testdata keys
 
 
+def image_file_names(data: dict[str, object], extension: str) -> list[str]:
+    """Candidate names of a stated image's file *extension* (``manifest``,
+    ``tar.bz2``) in its deploy folder, most explicit first.
+
+    The poky releases name image files differently (suite-b, sicherheit-2,
+    from the poky source): scarthgap folds ``.rootfs`` into IMAGE_NAME,
+    kirkstone/dunfell append IMAGE_NAME_SUFFIX (``??= ".rootfs"``) to the
+    file but not to IMAGE_NAME or the testdata file. Hence: the file name of
+    IMAGE_MANIFEST (manifest only), IMAGE_NAME + a stated IMAGE_NAME_SUFFIX,
+    IMAGE_NAME, IMAGE_NAME + ".rootfs" (the default). Only names, no path:
+    the caller looks in the testdata's folder alone, never elsewhere.
+    """
+    name = data.get("IMAGE_NAME")
+    if not isinstance(name, str) or not name or "/" in name or not name.isprintable():
+        return []
+    out: list[str] = []
+    manifest = data.get("IMAGE_MANIFEST")
+    if extension == "manifest" and isinstance(manifest, str) and manifest:
+        out.append(Path(manifest).name)
+    suffix = data.get("IMAGE_NAME_SUFFIX")
+    if isinstance(suffix, str) and suffix and "/" not in suffix:
+        out.append(f"{name}{suffix}.{extension}")
+    out += [f"{name}.{extension}", f"{name}.rootfs.{extension}"]
+    # A name from the build is foreign input: no path part, no control
+    # character, not "." or ".." (suite-b's review).
+    return [n for i, n in enumerate(out)
+            if n and n not in out[:i] and n not in (".", "..")
+            and "/" not in n and "\\" not in n and n.isprintable()]
+
+
+def _image_file(image: _Image, extension: str) -> Path | None:
+    """The first regular file among :func:`image_file_names` in the image's
+    own deploy folder."""
+    for candidate in image_file_names(image.data, extension):
+        path = _regular(image.folder, candidate)
+        if path is not None:
+            return path
+    return None
+
+
 def _stated_images(tmp: Path) -> list[_Image]:
     """Every image a regular ``*.testdata.json`` describes."""
     found: list[_Image] = []
@@ -373,7 +413,7 @@ def _stated_images(tmp: Path) -> list[_Image]:
             continue  # a machine folder linked from elsewhere (named by outside_roots)
         try:
             data = json.loads(testdata.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
+        except (OSError, ValueError, RecursionError):
             continue
         if isinstance(data, dict) and isinstance(data.get("IMAGE_NAME"), str):
             found.append(_Image(testdata.parent, data))
@@ -454,9 +494,8 @@ def _scan(build_dir: Path) -> tuple[dict[str, ComponentEvidence], YoctoImageEvid
     duplicates: list[str] = []
     hardlinks: list[str] = []
     for image in images:
-        name = str(image.data["IMAGE_NAME"])
         for fstype in _fstypes(image):
-            path = _regular(image.folder, f"{name}.{fstype}")
+            path = _image_file(image, fstype)
             if path is None:
                 continue  # stated, but not in the folder: not invented
             try:
@@ -619,9 +658,9 @@ def _manifest_paths(tmp: Path) -> list[Path]:
     if images:
         paths: list[Path] = []
         for image in images:
-            name = f"{image.data['IMAGE_NAME']}.manifest"
-            path = _regular(image.folder, name)
+            path = _image_file(image, "manifest")
             if path is None or not within(path, tmp):
+                name = f"{image.data['IMAGE_NAME']}.manifest"
                 raise ManifestUnreadableError(
                     f"{_printable(name)}: the stated image's manifest is missing")
             paths.append(path)
@@ -747,7 +786,7 @@ def _recipe_homepages(tmp: Path) -> dict[str, tuple[str, list[str]]]:
             continue
         try:
             doc = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
+        except (OSError, ValueError, RecursionError):
             continue
         packages = doc.get("packages") if isinstance(doc, dict) else None
         recipe, homepage, downloads = "", "", []
