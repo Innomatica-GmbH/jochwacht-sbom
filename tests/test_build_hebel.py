@@ -12,8 +12,12 @@ evidence leaves the house without the customer's explicit choice.
 from __future__ import annotations
 
 import json
+import shutil
+import sys
 from pathlib import Path
 from typing import Any
+
+import pytest
 
 from jochwacht_sbom.collector import collect_components
 from jochwacht_sbom.sbom_out import build_cyclonedx, slim_bytes
@@ -288,3 +292,29 @@ def test_the_local_bill_names_the_buildroot_product(tmp_path: Path) -> None:
     assert (meta["name"], meta["version"]) == ("buildroot", "2025.08.2")
     sent = json.loads(slim_bytes(*collect_components(tmp_path), project_name="fw"))
     assert sent["metadata"]["component"]["name"] == "fw"
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="symbolic links need privileges on Windows")
+@pytest.mark.parametrize("rel", ["output", "output/legal-info"])
+def test_a_buildroot_part_linked_outside_is_named_never_read(tmp_path: Path, rel: str) -> None:
+    """Y1 for Buildroot (coordination): with output/ or legal-info/ a link out
+    of the scanned folder, the build fell away without a word. Nothing is
+    read from outside; the customer is told which link was not followed."""
+    import os
+
+    from click.testing import CliRunner
+
+    from jochwacht_sbom.cli import main
+
+    root = _tree(tmp_path / "proj")
+    inside = root / rel
+    outside = tmp_path / "elsewhere" / Path(rel).name
+    outside.parent.mkdir()
+    shutil.move(str(inside), str(outside))
+    os.symlink(outside, inside)
+    components, stats = collect_components(root)
+    assert not any(c.delivered_files for c in components)
+    expected = f"Buildroot build part {rel} points outside"
+    assert any(expected in w for w in stats.build_warnings), stats.build_warnings
+    res = CliRunner().invoke(main, [str(root)])
+    assert expected in " ".join(res.output.split()), res.output
