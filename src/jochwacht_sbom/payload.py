@@ -103,6 +103,10 @@ class CheckStats(BaseModel):
     #: File NAMES skipped for their size (over core.file_limit),
     #: each once. Local only: shown to the customer, never sent.
     oversized_files: list[str] = Field(default_factory=list, exclude=True)
+    #: In-tree Buildroot source folders (relative, "." = the scanned folder)
+    #: the generic scanners did not read: Buildroot's own tooling is not the
+    #: product, its build says what is. Local only: shown, never sent.
+    buildroot_source_skipped: list[str] = Field(default_factory=list, exclude=True)
     #: Number of conditional ALTERNATIVES carried in the payload —
     #: not part of the component count, surfaced so the report can prompt the
     #: customer to pick a backend / configure the build.

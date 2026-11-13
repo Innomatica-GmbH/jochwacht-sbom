@@ -163,3 +163,100 @@ def test_licence_text_that_is_not_valid_spdx_stays_text() -> None:
         assert "expression" not in got[0] or raw == "BSD-3-Clause or GPL-2.0", (raw, got)
     assert cyclonedx_licenses("BSD-3-Clause or GPL-2.0") == [
         {"expression": "BSD-3-Clause OR GPL-2.0"}]
+
+
+def _in_tree(root: Path) -> Path:
+    """An in-tree Buildroot build: the Buildroot source with .config and
+    package/ around output/ (suite-c on zc706, Abweichung 3)."""
+    _tree(root)
+    (root / ".config").write_text("BR2_HAVE_DOT_CONFIG=y\n", encoding="utf-8")
+    (root / "package" / "busybox").mkdir(parents=True)
+    (root / "package" / "busybox" / "Config.in").write_text(
+        "config BR2_PACKAGE_BUSYBOX\n\tbool \"busybox\"\n", encoding="utf-8")
+    kconfig = root / "support" / "kconfig"
+    kconfig.mkdir(parents=True)
+    (kconfig / "Makefile").write_text(
+        "HOSTLOADLIBES_gconf = $(shell pkg-config --libs gtk+-2.0)\n"
+        "HOSTLOADLIBES_qconf = $(shell pkg-config --libs Qt5Core QtCore)\n"
+        "HOSTLOADLIBES_nconf = -lmenu -lpanel -lmenuw\n", encoding="utf-8")
+    (root / "utils").mkdir()
+    (root / "utils" / "requirements.txt").write_text("flask==0.12.2\n", encoding="utf-8")
+    return root
+
+
+def test_the_buildroot_source_of_an_in_tree_build_is_not_scanned(tmp_path: Path) -> None:
+    """Buildroot's own tooling (kconfig's pkg-config probes, utils/) is not
+    the product; the build tells what is (suite-c, Abweichung 3)."""
+    components, stats = collect_components(_in_tree(tmp_path))
+    names = {c.name for c in components}
+    for foreign in ("gtk+-2.0", "Qt5Core", "QtCore", "menu", "menuw", "panel", "flask"):
+        assert foreign not in names, foreign
+    assert {"busybox", "gcc"} <= names
+    assert stats.buildroot_source_skipped == ["."]
+
+
+def test_a_project_beside_the_buildroot_tree_is_still_scanned(tmp_path: Path) -> None:
+    _in_tree(tmp_path / "buildroot")
+    app = tmp_path / "app"
+    app.mkdir()
+    (app / "requirements.txt").write_text("requests==2.31.0\n", encoding="utf-8")
+    components, stats = collect_components(tmp_path)
+    names = {c.name for c in components}
+    assert "requests" in names
+    assert "flask" not in names and "gtk+-2.0" not in names
+    assert stats.buildroot_source_skipped == ["buildroot"]
+    sent = json.loads(slim_bytes(components, stats, project_name="fw"))
+    assert "buildroot_source_skipped" not in json.dumps(sent)
+
+
+def test_buildroot_names_and_versions_are_cleaned_before_anything(tmp_path: Path) -> None:
+    """Buildroot's SBOM is foreign text: a bidi override or a zero-width
+    space in name or version must not reach the bill or the upload."""
+    root = _tree(tmp_path)
+    sbom = root / "output" / "legal-info" / "buildroot.cdx.json"
+    doc = json.loads(sbom.read_text(encoding="utf-8"))
+    comp = doc["components"][0]
+    comp["name"] = "busy\u202ebox"
+    comp["version"] = "1.37.0\u200b\x1b[31m"
+    comp["cpe"] = "cpe:2.3:a:busybox:busybox:1.37.0\u2028:-:*:*:*:*:*:*"
+    comp["purl"] = "pkg:generic/busy%E2%80%AEbox@1.37.0"
+    sbom.write_text(json.dumps(doc), encoding="utf-8")
+    components, stats = collect_components(root)
+    by = {c.name: c for c in components}
+    assert "busybox" in by, sorted(by)
+    assert by["busybox"].version == "1.37.0"
+    assert "\u2028" not in by["busybox"].local_cpe
+    assert "%E2%80%AE" not in (by["busybox"].local_purl or "")
+    sent = slim_bytes(components, stats, project_name="fw").decode("utf-8")
+    full = json.dumps(build_cyclonedx(components, stats, project_name="fw"))
+    for bad in ("\u202e", "\u200b", "\u2028", "\x1b"):
+        assert bad not in sent and bad not in full, repr(bad)
+
+
+def test_send_with_yes_still_names_the_copy_it_uploads(tmp_path: Path, monkeypatch: Any) -> None:
+    from click.testing import CliRunner
+
+    from jochwacht_sbom import api
+    from jochwacht_sbom.cli import main
+
+    root = _tree(tmp_path)
+    monkeypatch.setattr(api.Client, "upload",
+                        lambda self, sbom, *, product: {"status": "accepted"})
+    monkeypatch.setenv("JOCHWACHT_API_KEY", "jw_test_" + "x" * 32)
+    res = CliRunner().invoke(main, [str(root), "--send", "--yes"])
+    assert res.exit_code == 0, res.output
+    out = " ".join(res.output.split())
+    assert "uploaded: .jochwacht/sent.cdx.json (2 components)" in out
+
+
+def test_the_summary_names_the_skipped_buildroot_source(tmp_path: Path) -> None:
+    from click.testing import CliRunner
+
+    from jochwacht_sbom.cli import main
+
+    root = tmp_path / "proj"
+    _in_tree(root / "buildroot")
+    res = CliRunner().invoke(main, [str(root)])
+    assert res.exit_code == 0, res.output
+    out = " ".join(res.output.split())
+    assert "Buildroot source not scanned (its build is read instead): buildroot" in out

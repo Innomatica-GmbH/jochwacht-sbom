@@ -525,6 +525,12 @@ def _run(  # noqa: PLR0913 — mirrors the CLI surface
         )
     for src in stats.build_output_sources:
         console.print(f"[dim]Build output: {fg(src)}[/dim]")
+    if stats.buildroot_source_skipped:
+        # Buildroot's own tooling (kconfig, utils/) is not the product: named,
+        # never silent (suite-c, Abweichung 3).
+        console.print(
+            "[dim]Buildroot source not scanned (its build is read instead): "
+            f"{fg(', '.join(stats.buildroot_source_skipped))}[/dim]", soft_wrap=True)
     if stats.oversized_files:
         # a skipped file is named in the result, never only a log line
         console.print(
@@ -657,6 +663,11 @@ def _run(  # noqa: PLR0913 — mirrors the CLI surface
             # --yes stays for a terminal.
             console.print("sending without confirmation (no terminal)")
     answer = api.Client(api_base, api_key).upload(upload_copy.read_bytes(), product=product)
+    if assume_yes:
+        # --yes asks nothing, but still says which file left the house.
+        console.print(
+            f"uploaded: {fg(upload_copy.relative_to(path).as_posix())} "
+            f"({n_sent} components)", soft_wrap=True)
     kept = api.save_last_upload(path, api_base, answer)
     state = answer.get("status", "?")
     console.print(

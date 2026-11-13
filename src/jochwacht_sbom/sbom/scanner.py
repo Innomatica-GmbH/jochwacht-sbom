@@ -2423,6 +2423,7 @@ def scan_directory_recursive(
     path: Path, *, max_depth: int = 5, cmake_extra_cache: Path | None = None,
     target_envs: list[TargetEnv] | None = None,
     read_files: list[Path] | None = None,
+    skip_dirs: tuple[Path, ...] = (),
 ) -> list[Dependency]:
     """Recursively scan a directory tree for dependency files.
 
@@ -2439,6 +2440,8 @@ def scan_directory_recursive(
     Args:
         path: Root directory to scan.
         max_depth: Maximum directory depth to recurse into.
+        skip_dirs: Directories neither scanned nor entered (the source of an
+            in-tree Buildroot build: its own tooling is not the product).
 
     Returns:
         Combined, deduplicated list of all discovered dependencies.
@@ -2450,10 +2453,11 @@ def scan_directory_recursive(
     # CMakeLists.txt, a find_package deep in src/; a configured build's
     # CMakeCache.txt (in build/, _build/, …) is the source of truth.
     cmake_ctx = build_cmake_context(path, extra_cache=cmake_extra_cache)
+    skipped = {d.resolve() for d in skip_dirs}
 
     def _walk(current: Path, depth: int) -> None:
         resolved = current.resolve()
-        if resolved in seen_dirs:
+        if resolved in seen_dirs or resolved in skipped:
             return
         seen_dirs.add(resolved)
 

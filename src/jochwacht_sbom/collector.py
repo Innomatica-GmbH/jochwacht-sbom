@@ -14,6 +14,7 @@ anywhere, instantly, with zero setup.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -104,6 +105,34 @@ def _identity(name: str) -> str:
     return name.strip().lower()
 
 
+def _buildroot_sources(path: Path, record_failure: Any) -> tuple[Path, ...]:
+    """The Buildroot source folders of in-tree builds under *path* (resolved).
+
+    An in-tree build reads its packages from the build; the folder around it
+    is Buildroot itself (kconfig's pkg-config probes for gtk+-2.0 and Qt5Core,
+    utils/), not the product. suite-c measured six such phantom components on
+    zc706 (Abweichung 3). An O= build has no source inside: nothing skipped.
+    """
+    from jochwacht_sbom.buildroot_build import find_buildroot_builds
+
+    try:
+        roots = find_buildroot_builds(path)
+    except Exception as exc:  # noqa: BLE001 — a finder defect, recorded, not fatal
+        record_failure("buildroot_build", "legal-info/buildroot.cdx.json", exc)
+        return ()
+    return tuple(
+        r.resolve() for r in roots
+        if (r / ".config").is_file() and (r / "package").is_dir()
+    )
+
+
+def _below_any(p: Path, roots: tuple[Path, ...]) -> bool:
+    if not roots:
+        return False
+    rp = p.resolve()
+    return any(rp == r or r in rp.parents for r in roots)
+
+
 def _buildroot_build_components(
     path: Path, record_failure: Any,
 ) -> list[CheckComponent]:
@@ -127,20 +156,32 @@ def _buildroot_build_components(
     except Exception as exc:  # noqa: BLE001 — a reader defect, recorded, not fatal
         record_failure("buildroot_build", "legal-info/buildroot.cdx.json", exc)
         return []
+    from jochwacht_sbom.sbom.classify import _purl_needs_cleaning, strip_control_chars
+
+    # Buildroot's SBOM is foreign text: control, format and separator
+    # characters leave name, version, purl, CPE and licence before anything
+    # else sees them (the same rule as clean_dependency on the other paths).
+    # A purl that needs cleaning is dropped, never repaired.
+    clean = strip_control_chars
+
+    def clean_patch(patch: Any) -> dict[str, Any]:
+        return {k: clean(v) if isinstance(v, str) else v for k, v in dict(patch).items()}
+
     out: list[CheckComponent] = []
     for build in builds:
         for pb in build.packages:
             pkg = pb.package
-            licence = join_licenses(pkg.licenses, classify=classify) or ""
+            licence = clean(join_licenses(pkg.licenses, classify=classify) or "")
             out.append(CheckComponent(
-                name=pkg.name, version=pkg.version, ecosystem="buildroot",
-                local_purl=pkg.purl, source_type="build-output",
+                name=clean(pkg.name), version=clean(pkg.version), ecosystem="buildroot",
+                local_purl="" if _purl_needs_cleaning(pkg.purl) else pkg.purl,
+                source_type="build-output",
                 tier=_LOCKFILE_TIER, confidence=_LOCKFILE_CONFIDENCE,
                 scope="excluded" if pkg.host_reason else "",
                 scope_reason=pb.scope_reason,
                 local_license=licence,
                 local_license_origin="buildroot:legal-info/buildroot.cdx.json" if licence else "",
-                local_cpe=pkg.cpe, patches=[dict(p) for p in pkg.patches],
+                local_cpe=clean(pkg.cpe), patches=[clean_patch(p) for p in pkg.patches],
                 delivered_files=list(pb.files), not_evidenced=pb.not_evidenced,
                 creator_url=pb.creator.url if pb.creator else "",
                 creator_origin=pb.creator.origin if pb.creator else "",
@@ -148,7 +189,7 @@ def _buildroot_build_components(
             ))
         for image in build.images:
             out.append(CheckComponent(
-                name=Path(image.path).name, ecosystem="buildroot",
+                name=clean(Path(image.path).name), ecosystem="buildroot",
                 source_type="build-output", tier=_LOCKFILE_TIER,
                 confidence=_LOCKFILE_CONFIDENCE, delivered_image=image,
             ))
@@ -203,6 +244,7 @@ def collect_components(
 
     own = _own_identities(path)
     own_dropped: set[str] = set()
+    br_sources = _buildroot_sources(path, record_failure)
 
     # One CMake context for both paths: tool + program-module
     # classification must match scan_cmake / the suite reconciler exactly.
@@ -254,7 +296,7 @@ def collect_components(
     manifest_files: list[Path] = []
     for dep in scan_directory_recursive(
         path, max_depth=max_depth, target_envs=target_envs,
-        read_files=manifest_files,
+        read_files=manifest_files, skip_dirs=br_sources,
     ):
         # Control-char hygiene FIRST (Befund 15 — a scanner once read colored
         # tool output), so the dedup key and the uploaded payload are clean.
@@ -357,7 +399,10 @@ def collect_components(
 
     # Path 2: build-file pipeline (deterministic tiers only).
     tiers = set(_DEFAULT_TIERS | {_TOOL_TIER}) if with_tools else set(_DEFAULT_TIERS)
-    build_files = collect_build_files(path, max_depth=max_depth)
+    build_files = [
+        (p, kind) for p, kind in collect_build_files(path, max_depth=max_depth)
+        if not _below_any(p, br_sources)
+    ]
     pipeline_deps, _artifacts, _internal = run_pipeline(
         path, build_files, enabled_tiers=tiers
     )
@@ -523,5 +568,8 @@ def collect_components(
         lifecycle=lifecycle,
         go_versions_unresolved=go_versions_unresolved,
         oversized_files=file_limit.skipped_names(),
+        buildroot_source_skipped=[
+            Path(os.path.relpath(src, path.resolve())).as_posix() for src in br_sources
+        ],
     )
     return components, stats
