@@ -141,7 +141,10 @@ _stdout = SafeConsole(soft_wrap=True)
 @click.option(
     "--with-tools",
     is_flag=True,
-    help="Additionally use native package-manager CLIs (cargo, go, npm, ...) if installed.",
+    help="Additionally use native package-manager CLIs (cargo, go, npm, cmake, gradle, ...) "
+         "if installed. This runs the project's own build code (CMakeLists.txt, gradlew, "
+         "conanfile.py, Maven plugins): only on code you trust, never on a pull request "
+         "from a fork.",
 )
 @click.option(
     "--no-declared-metadata",
@@ -653,7 +656,9 @@ def _run(  # noqa: PLR0913 — mirrors the CLI surface
         return
 
     if output is not None:
-        output.write_bytes(serialize_payload(payload))
+        from jochwacht_sbom.safe_write import write_file
+
+        write_file(output, serialize_payload(payload))  # never through a link (S3)
         console.print(
             f"[green]Payload written to {fg(output)}.[/green]"
         )

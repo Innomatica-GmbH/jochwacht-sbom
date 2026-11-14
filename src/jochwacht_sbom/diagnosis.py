@@ -243,19 +243,27 @@ def unsupported_build_report(
 def write_report(report: dict[str, object], *, near: Path) -> Path:
     """Write *report* as pretty JSON next to the SBOM and return the path.
 
-    When that directory cannot be written, the file goes to the system's
-    temporary directory instead — the run must still be able to say where
+    Never through a symbolic link (sicherheit-2, S3): the scanned folder is
+    foreign input, and a marker such as ``SConstruct`` is enough to make a
+    run write this file. When the file there is a link or the directory
+    cannot be written, the file goes to the system's temporary directory
+    under a fresh name (``mkstemp``: created anew, mode 0600, no fixed name
+    anyone could place a link at) — the run must still be able to say where
     the diagnosis is.
     """
-    text = json.dumps(report, indent=2, ensure_ascii=False) + "\n"
+    from jochwacht_sbom.core.exceptions import JochwachtError
+    from jochwacht_sbom.safe_write import write_file
+
+    data = (json.dumps(report, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
     target = near / DIAGNOSIS_FILENAME
     try:
-        target.write_text(text, encoding="utf-8")
+        write_file(target, data)
         return target
-    except OSError:
-        fallback = Path(tempfile.gettempdir()) / DIAGNOSIS_FILENAME
-        fallback.write_text(text, encoding="utf-8")
-        return fallback
+    except (OSError, JochwachtError):
+        fd, name = tempfile.mkstemp(prefix="jochwacht-sbom-diagnosis-", suffix=".json")
+        with open(fd, "wb") as fh:
+            fh.write(data)
+        return Path(name)
 
 
 def find_unsupported_markers(path: Path, *, max_depth: int = 5) -> dict[str, int]:

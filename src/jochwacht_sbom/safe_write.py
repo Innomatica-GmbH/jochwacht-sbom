@@ -3,8 +3,15 @@
 A scanned repository is foreign input (sicherheit-2, S1/S2, 13.11.2026): in
 CI it can be a pull request from a fork. If a file the collector writes, or
 the folder ``.jochwacht`` it writes into, is a symbolic link, writing through
-it would overwrite whatever the link points to. Every write goes through
-:func:`write_file`, which refuses a link with a clear message.
+it would overwrite whatever the link points to. Every file the collector
+writes at a named place goes through :func:`write_file`, which refuses a
+link with a clear message: the bill, ``.jochwacht/sent.cdx.json``,
+``.jochwacht/last-upload.json``, the diagnosis file and the ``--output``
+payload (S3). The only other writes are temporary files under fresh names
+from :mod:`tempfile` (``mkstemp``, ``mkdtemp``, ``NamedTemporaryFile``):
+the diagnosis fallback and the output files of ``--with-tools``. What the
+build tools of ``--with-tools`` write themselves is theirs; that flag runs
+the project's own build code and is for code you trust.
 """
 
 from __future__ import annotations

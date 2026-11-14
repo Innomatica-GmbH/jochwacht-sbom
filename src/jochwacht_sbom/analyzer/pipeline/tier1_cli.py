@@ -9,6 +9,7 @@ Each scanner checks tool availability via shutil.which() before attempting.
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -361,8 +362,10 @@ class CmakeTraceScanner:
         with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tmp:
             tmp_path = Path(tmp.name)
 
-        build_dir = project_path / "_jochwacht_cmake_trace"
-        build_dir.mkdir(exist_ok=True)
+        # A fresh temporary build folder outside the scanned folder: in it, a
+        # link ``_jochwacht_cmake_trace`` made cmake write its cache and
+        # makefiles elsewhere (sicherheit-2, S3). cmake takes the source path.
+        build_dir = Path(tempfile.mkdtemp(prefix="jochwacht-cmake-trace-"))
 
         result = _run_cmd(
             [
@@ -615,8 +618,12 @@ class GradleDepScanner:
 
     def _find_gradle(self, project_path: Path) -> str | None:
         """Find gradle executable — prefer project's gradlew wrapper."""
+        # The wrapper only as a regular, executable file of the project: never
+        # through a link and never made executable by us (chmod follows a
+        # link; sicherheit-2, S3).
         wrapper = project_path / "gradlew"
-        if wrapper.is_file():
+        if (wrapper.is_file() and not wrapper.is_symlink()
+                and os.access(wrapper, os.X_OK)):
             return str(wrapper)
         if shutil.which("gradle") is not None:
             return "gradle"
@@ -637,11 +644,6 @@ class GradleDepScanner:
         gradle_cmd = self._find_gradle(project_path)
         if gradle_cmd is None:
             return ScanResult(tier=self.tier, scanner_name=self.name)
-
-        # Ensure gradlew is executable
-        wrapper = project_path / "gradlew"
-        if wrapper.is_file():
-            wrapper.chmod(wrapper.stat().st_mode | 0o111)
 
         # Try each configuration until one produces deps
         for config in self._CONFIGURATIONS:
