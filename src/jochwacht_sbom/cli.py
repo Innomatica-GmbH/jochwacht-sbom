@@ -32,7 +32,7 @@ from jochwacht_sbom.sbom_out import (
     SPEC_VERSION,
     SPEC_VERSIONS,
     classify_existing,
-    slim_bytes,
+    upload_bytes,
     write_cyclonedx,
 )
 from jochwacht_sbom.upload import DEFAULT_SUBMIT_URL, serialize_payload
@@ -309,9 +309,10 @@ def _print_leaving_summary(written: Path, n_components: int, base: str, product:
     host = base.split("://", 1)[-1]
     console.print(
         f"\n[bold]This would be sent[/bold] to {fg(host)}: {fg(str(written))} exactly as "
-        f"written ({n_components} {noun}; open the file to see every field). Names, "
-        f"versions and your own declarations only; what a build directory proves "
-        f"(file hashes, file names, creator) stays in your local bill.",
+        f"written ({n_components} {noun}; open the file to see every field): the full "
+        f"bill with names, versions, licences, CPE, manufacturer and, from a build "
+        f"directory, the delivered file names and their SHA-512. Only the text of your "
+        f"patches stays local (each is named by its SHA-256), and no absolute path.",
         soft_wrap=True,
     )
     if product:
@@ -696,15 +697,16 @@ def _run(  # noqa: PLR0913 — mirrors the CLI surface
         return
 
     # --- The send path: show what leaves the house, then ask -------------
-    # The upload is the slim copy (0.20): the build evidence stays local. It is
-    # written first, so the customer can open exactly what is sent.
+    # The upload is the full bill (0.21, Ivan: "volle sbom immer!") without
+    # patch texts and without the folder's name. It is written first, so the
+    # customer can open exactly what is sent.
     from jochwacht_sbom.safe_write import ensure_folder, write_file
 
     upload_copy = path / ".jochwacht" / "sent.cdx.json"
     ensure_folder(upload_copy.parent)  # never through a symbolic link (sicherheit-2, S1)
-    write_file(upload_copy, slim_bytes(components, stats, project_name=path.resolve().name,
-                                       spec_version=spec_version, release=label), fresh=True)
-    n_sent = len([c for c in components if c.delivered_image is None])
+    write_file(upload_copy, upload_bytes(components, stats, product=product,
+                                         spec_version=spec_version, release=label), fresh=True)
+    n_sent = len(components)
     if not assume_yes:
         _print_leaving_summary(upload_copy, n_sent, api_base, product)
         if _stdin_is_terminal():

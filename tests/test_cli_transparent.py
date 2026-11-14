@@ -108,8 +108,9 @@ class TestSendConfirmsBeforePost:
 
     def test_send_sends_the_written_sbom(self, tmp_path: Path) -> None:
         # 12.11.2026: what leaves the house is a file the customer can open.
-        # 0.20: it is the slim copy .jochwacht/sent.cdx.json; without build
-        # evidence it says the same as the local bill (serial and time aside).
+        # 0.21: it is the full bill .jochwacht/sent.cdx.json; it says the same
+        # as the local bill (serial and time aside), only the product name is
+        # never the folder's (coordination 14.11.2026).
         import json as _json
 
         proj = _project(tmp_path)
@@ -120,9 +121,12 @@ class TestSendConfirmsBeforePost:
         assert up.call_args[0][0] == sent
         local = _json.loads((proj / "sbom.cdx.json").read_text(encoding="utf-8"))
         copy = _json.loads(sent)
+        assert copy["metadata"]["component"]["name"] == "product"
+        assert local["metadata"]["component"]["name"] == proj.resolve().name
         for doc in (local, copy):
             doc.pop("serialNumber")
             doc["metadata"].pop("timestamp")
+            doc["metadata"]["component"].pop("name")
         assert copy == local
 
     def test_send_without_key_fails_before_scanning(

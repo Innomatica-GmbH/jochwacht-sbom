@@ -22,7 +22,7 @@ from jochwacht_sbom import api
 from jochwacht_sbom.api import ApiError, Client
 from jochwacht_sbom.cli import main
 from jochwacht_sbom.collector import collect_components
-from jochwacht_sbom.sbom_out import build_cyclonedx, slim_bytes
+from jochwacht_sbom.sbom_out import build_cyclonedx, upload_bytes
 
 
 def _project(tmp_path: Path) -> Path:
@@ -83,17 +83,17 @@ def test_the_two_refusals_have_our_own_sentence(code: str, words: str) -> None:
 
 def test_no_bill_says_unspecified(tmp_path: Path) -> None:
     components, stats = collect_components(_project(tmp_path))
-    for doc in (build_cyclonedx(components, stats, project_name="fw"),
-                json.loads(slim_bytes(components, stats, project_name="fw"))):
+    for doc, name in ((build_cyclonedx(components, stats, project_name="fw"), "fw"),
+                      (json.loads(upload_bytes(components, stats)), "product")):
         meta = doc["metadata"]["component"]
-        assert meta["name"] == "fw"
+        assert meta["name"] == name          # the upload never names the folder
         assert "version" not in meta, meta
 
 
 def test_the_label_is_the_version_in_both_bills(tmp_path: Path) -> None:
     components, stats = collect_components(_project(tmp_path))
     full = build_cyclonedx(components, stats, project_name="fw", release="1.4.2")
-    sent = json.loads(slim_bytes(components, stats, project_name="fw", release="1.4.2"))
+    sent = json.loads(upload_bytes(components, stats, release="1.4.2"))
     assert full["metadata"]["component"]["version"] == "1.4.2"
     assert sent["metadata"]["component"]["version"] == "1.4.2"
 

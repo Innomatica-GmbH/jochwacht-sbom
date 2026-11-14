@@ -128,6 +128,18 @@ jochwacht-sbom . --send --yes --release 1.4.2   # writes sbom.cdx.json and sends
 jochwacht-sbom status --wait 600                 # 0 green/yellow/waiting for a person, 1 red, 2 error
 ```
 
+**What goes up.** `--send` uploads the full bill: every component with name,
+version, purl, licence, CPE and manufacturer, and from a Yocto or Buildroot
+build directory the delivered files (their names or paths inside the image,
+with SHA-512), the image files, patches by type, the creator the build
+proves. It is written first to `.jochwacht/sent.cdx.json`, exactly as sent,
+so you can open it before saying yes. Two things never go up: the text of a
+patch stays on your machine (the upload names each patch by its SHA-256 and
+size; it can be your own source code, and TR-03183 does not ask for it), and
+the name of the scanned folder (the product name is the one your build
+states, else `--product`, else `product`). No absolute path, host name or
+user name is in it.
+
 - The key comes from `JOCHWACHT_API_KEY`, the address from `JOCHWACHT_API_URL`
   (default `https://api.jochwacht.dev`). Only https, no redirect is followed,
   the key is never printed or saved.

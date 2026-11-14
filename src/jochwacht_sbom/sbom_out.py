@@ -21,10 +21,13 @@ already on the customer's disk.
 
 from __future__ import annotations
 
+import base64
+import binascii
+import hashlib
 import json
 import uuid
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from jochwacht_sbom import __version__, properties
 from jochwacht_sbom.core.exceptions import JochwachtError
@@ -72,25 +75,19 @@ def _bom_ref(comp: CheckComponent) -> str:
 
 
 def _components_with_refs(
-    components: list[CheckComponent], *, full: bool = True, creator_ok: bool = True,
+    components: list[CheckComponent], *, creator_ok: bool = True,
 ) -> list[dict[str, object]]:
-    """Components with unique ``bom-ref`` values; a repeat gets ``#n``.
-
-    *full*: the local bill with what a build directory proves (shared writer
-    ``sbom/cdx_files.py``); False: the upload, as slim as in 0.19.
+    """Components with unique ``bom-ref`` values; a repeat gets ``#n``,
+    with what a build directory proves (shared writer ``sbom/cdx_files.py``).
     """
     out: list[dict[str, object]] = []
     seen: dict[str, int] = {}
     for comp in components:
-        if not full and comp.delivered_image is not None:
-            continue  # an image without a package is build evidence only
         base = _bom_ref(comp)
         n = seen.get(base, 0)
         seen[base] = n + 1
         ref = base if n == 0 else f"{base}#{n + 1}"
-        entry = _component(comp)
-        if full:
-            entry = _with_build_evidence(entry, comp, ref=ref, creator_ok=creator_ok)
+        entry = _with_build_evidence(_component(comp), comp, ref=ref, creator_ok=creator_ok)
         entry["bom-ref"] = ref
         out.append(entry)
     return out
@@ -201,13 +198,10 @@ def build_cyclonedx(
     *,
     project_name: str,
     spec_version: str = SPEC_VERSION,
-    full: bool = True,
     release: str = "",
 ) -> dict[str, object]:
-    """Build the CycloneDX document for *components*.
-
-    *full* (default): the local bill, with the build evidence. ``full=False``:
-    what ``--send`` uploads, without it (see :func:`slim_bytes`).
+    """Build the CycloneDX document for *components*: the local bill, with
+    the build evidence (what ``--send`` uploads is :func:`upload_bytes`).
 
     Args:
         components: What the check collected.
@@ -229,7 +223,7 @@ def build_cyclonedx(
     # release label first (their own word, in both bills), else in the local
     # bill the product version the one build names, as the suite writes it.
     name, version = project_name, release
-    if full and stats.build_product:
+    if stats.build_product:
         # The local bill keeps what the build states (sicherheit-2 on
         # 2cfd184); a label that differs stands beside it as a property.
         name = stats.build_product[0]
@@ -260,27 +254,106 @@ def build_cyclonedx(
             "component": product,
         },
         "components": _components_with_refs(
-            components, full=full, creator_ok=spec_version not in ("1.5",)),
+            components, creator_ok=spec_version not in ("1.5",)),
     }
 
 
-def slim_bytes(
+#: The name of the upload's product when the build states none and no
+#: --product is given: never the scanned folder's name (coordination,
+#: 14.11.2026).
+UPLOAD_PRODUCT_FALLBACK = "product"
+
+
+def _patch_text(patch: dict[str, Any]) -> bytes | None:
+    """The text of a CycloneDX patch as bytes (base64 decoded), or None."""
+    diff = patch.get("diff")
+    text = diff.get("text") if isinstance(diff, dict) else None
+    content = text.get("content") if isinstance(text, dict) else None
+    if not isinstance(content, str):
+        return None
+    if isinstance(text, dict) and text.get("encoding") == "base64":
+        try:
+            return base64.b64decode(content, validate=True)
+        except (binascii.Error, ValueError):
+            return content.encode("utf-8")
+    return content.encode("utf-8")
+
+
+def _patches_named_not_shown(entry: dict[str, Any]) -> None:
+    """In the upload a patch keeps its type and ``resolves``; its text stays
+    in the local bill and is named by SHA-256 and size (coordination,
+    14.11.2026: the text can be the customer's own source code, and
+    TR-03183 asks for none)."""
+    pedigree = entry.get("pedigree")
+    patches = pedigree.get("patches") if isinstance(pedigree, dict) else None
+    if isinstance(pedigree, dict) and isinstance(patches, list) and patches:
+        props = entry.setdefault("properties", [])
+        kept: list[dict[str, Any]] = []
+        for n, patch in enumerate(patches, start=1):
+            if not isinstance(patch, dict):
+                continue
+            kept.append({k: v for k, v in patch.items() if k != "diff"})
+            data = _patch_text(patch)
+            value = (f"sha256:{hashlib.sha256(data).hexdigest()} size:{len(data)}"
+                     if data is not None else "no text")
+            if isinstance(props, list):
+                props.append({"name": properties.name(f"patch:{n}"), "value": value})
+        pedigree["patches"] = kept
+    for child in entry.get("components", []) or []:
+        if isinstance(child, dict):
+            _patches_named_not_shown(child)
+
+
+def upload_doc(
     components: list[CheckComponent],
     stats: CheckStats,
     *,
-    project_name: str,
+    product: str = "",
+    spec_version: str = SPEC_VERSION,
+    release: str = "",
+) -> dict[str, Any]:
+    """What ``--send`` uploads: the full bill (Ivan, 14.11.2026, "volle sbom
+    immer!"), with every field TR-03183 and the check need: the delivered
+    files with their SHA-512, manufacturer, licence, CPE, the image files.
+
+    Two things differ from the local bill: a patch is named by type, SHA-256
+    and size instead of its text, and ``metadata.component`` names the
+    product the build states, else *product* (--product), else
+    :data:`UPLOAD_PRODUCT_FALLBACK` — never the scanned folder. Its version
+    is the release label; a differing version the build states stands
+    beside it as a property.
+    """
+    doc: dict[str, Any] = build_cyclonedx(
+        components, stats, project_name=UPLOAD_PRODUCT_FALLBACK,
+        spec_version=spec_version, release=release)
+    built_name, built_version = stats.build_product or ("", "")
+    product_entry: dict[str, Any] = {
+        "type": "application",
+        "name": built_name or product or UPLOAD_PRODUCT_FALLBACK,
+    }
+    version = release or built_version
+    if version:
+        product_entry["version"] = version
+    if built_version and built_version != version:
+        product_entry["properties"] = [
+            {"name": properties.name("build-product-version"), "value": built_version}]
+    doc["metadata"]["component"] = product_entry
+    for entry in doc["components"]:
+        _patches_named_not_shown(entry)
+    return doc
+
+
+def upload_bytes(
+    components: list[CheckComponent],
+    stats: CheckStats,
+    *,
+    product: str = "",
     spec_version: str = SPEC_VERSION,
     release: str = "",
 ) -> bytes:
-    """What ``--send`` uploads: the bill without the build evidence.
-
-    The promise of this tool (coordination, 13.11.2026): without the
-    customer's explicit choice only names, versions and their own declarations
-    leave the house. Hashes, file names, file components, the creator, the
-    licence and CPE a build proves stay in the local file.
-    """
-    doc = build_cyclonedx(components, stats, project_name=project_name,
-                          spec_version=spec_version, full=False, release=release)
+    """:func:`upload_doc` as the bytes ``--send`` writes and uploads."""
+    doc = upload_doc(components, stats, product=product, spec_version=spec_version,
+                     release=release)
     return (json.dumps(doc, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
 
 

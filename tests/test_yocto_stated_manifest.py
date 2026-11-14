@@ -83,8 +83,10 @@ def test_b3_without_testdata_both_rows_and_a_warning(tmp_path: Path) -> None:
     assert any("2 image manifests" in w for w in stats.build_warnings)
 
 
-def test_b4_nothing_new_leaves_the_house(tmp_path: Path) -> None:
-    from jochwacht_sbom.sbom_out import slim_bytes
+def test_b4_no_build_warning_leaves_the_house(tmp_path: Path) -> None:
+    """The check payload stays without image names; the upload (since 0.21 the
+    full bill, image file names allowed) carries no build warning text."""
+    from jochwacht_sbom.sbom_out import upload_bytes
 
     root = _yocto(tmp_path)
     folder = root / IMAGES
@@ -93,14 +95,14 @@ def test_b4_nothing_new_leaves_the_house(tmp_path: Path) -> None:
     from jochwacht_sbom.payload import build_payload
 
     components, stats = collect_components(root)
-    # Both ways out: the slim SBOM (subscription upload) and the check payload
-    # JSON (upload_payload sends payload.model_dump_json()).
     payload = build_payload(voucher="", contact_email="", tool_version="t",
                             project_label="fw", components=components, stats=stats)
-    for sent in (slim_bytes(components, stats, project_name="fw").decode(),
-                 payload.model_dump_json()):
-        assert "stated image" not in sent and "testdata" not in sent
-        assert STAMP not in sent and "qemux86-64" not in sent
+    sent = payload.model_dump_json()
+    assert "stated image" not in sent and "testdata" not in sent
+    assert STAMP not in sent and "qemux86-64" not in sent
+    upload = upload_bytes(components, stats).decode()
+    assert "stated image" not in upload and "testdata" not in upload
+    assert not any(w in upload for w in stats.build_warnings)
 
 
 def test_kirkstone_naming_reads_the_build(tmp_path: Path) -> None:

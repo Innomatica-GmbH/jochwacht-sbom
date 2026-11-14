@@ -4,9 +4,9 @@ A Buildroot build in the scanned path is read by the shared core
 (``sbom/build_files.py``) and written by the shared writer
 (``sbom/cdx_files.py``): the LOCAL bill carries the delivered files with
 SHA-512, their proven properties, the creator the build proves and the host
-packages as not shipped. What ``--send`` uploads stays as slim as in 0.19:
-names, versions and the customer's own declarations; nothing of the build
-evidence leaves the house without the customer's explicit choice.
+packages as not shipped. Since 0.21 ``--send`` uploads that full bill
+(Ivan, 14.11.2026), only without patch texts and the folder's name
+(tests/test_upload_full.py).
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ from typing import Any
 import pytest
 
 from jochwacht_sbom.collector import collect_components
-from jochwacht_sbom.sbom_out import build_cyclonedx, slim_bytes
+from jochwacht_sbom.sbom_out import build_cyclonedx, upload_bytes
 
 ELF = b"\x7fELF\x02\x01\x01" + b"\x00" * 57
 
@@ -51,9 +51,9 @@ def _tree(root: Path) -> Path:
     return root
 
 
-def _doc(root: Path, *, full: bool = True) -> dict[str, Any]:
+def _doc(root: Path) -> dict[str, Any]:
     components, stats = collect_components(root)
-    return build_cyclonedx(components, stats, project_name="fw", full=full)
+    return build_cyclonedx(components, stats, project_name="fw")
 
 
 def _by_name(doc: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -99,29 +99,29 @@ def test_buildroot_packages_are_not_listed_twice(tmp_path: Path) -> None:
     assert names.count("busybox") == 1
 
 
-def test_the_upload_stays_as_slim_as_0_19(tmp_path: Path) -> None:
+def test_the_upload_carries_the_build_evidence_since_0_21(tmp_path: Path) -> None:
+    """Was: the upload stays as slim as 0.19. Ivan, 14.11.2026: the full bill."""
     root = _tree(tmp_path)
     components, stats = collect_components(root)
-    sent = slim_bytes(components, stats, project_name="fw")
-    text = sent.decode("utf-8")
-    for leaked in ("SHA-512", '"hashes"', '"manufacturer"', "jochwacht:evidence",
-                   "component-kind", "bsi:component", '"licenses"', '"cpe"', '"pedigree"'):
-        assert leaked not in text, leaked
+    text = upload_bytes(components, stats).decode("utf-8")
+    for carried in ("SHA-512", '"hashes"', "jochwacht:evidence", "component-kind",
+                    "bsi:component", '"licenses"', '"cpe"'):
+        assert carried in text, carried
     doc = json.loads(text)
     assert {c["name"] for c in doc["components"]} == {"busybox", "gcc"}
-    assert all("components" not in c for c in doc["components"])
+    assert any("components" in c for c in doc["components"])
 
 
 def test_without_a_build_directory_nothing_changes(tmp_path: Path) -> None:
     (tmp_path / "requirements.txt").write_text("requests==2.31.0\n", encoding="utf-8")
     full = _doc(tmp_path)
-    slim = json.loads(slim_bytes(*collect_components(tmp_path), project_name="fw"))
+    sent = json.loads(upload_bytes(*collect_components(tmp_path)))
     strip = ("serialNumber", "metadata")
     assert {k: v for k, v in full.items() if k not in strip} == \
-        {k: v for k, v in slim.items() if k not in strip}
+        {k: v for k, v in sent.items() if k not in strip}
 
 
-def test_send_uploads_the_slim_copy_it_shows(tmp_path: Path, monkeypatch: Any) -> None:
+def test_send_uploads_the_copy_it_shows(tmp_path: Path, monkeypatch: Any) -> None:
     """The customer can open exactly what leaves the house before saying yes."""
     from click.testing import CliRunner
 
@@ -143,7 +143,7 @@ def test_send_uploads_the_slim_copy_it_shows(tmp_path: Path, monkeypatch: Any) -
     assert res.exit_code == 0, res.output
     copy = root / ".jochwacht" / "sent.cdx.json"
     assert sent == [copy.read_bytes()]
-    assert b"SHA-512" not in sent[0]
+    assert b"SHA-512" in sent[0]                       # the full bill since 0.21
     assert b"SHA-512" in (root / "sbom.cdx.json").read_bytes()
     assert "sent.cdx.json" in " ".join(res.output.split())
 
@@ -210,7 +210,7 @@ def test_a_project_beside_the_buildroot_tree_is_still_scanned(tmp_path: Path) ->
     assert "requests" in names
     assert "flask" not in names and "gtk+-2.0" not in names
     assert stats.buildroot_source_skipped == ["buildroot"]
-    sent = json.loads(slim_bytes(components, stats, project_name="fw"))
+    sent = json.loads(upload_bytes(components, stats))
     assert "buildroot_source_skipped" not in json.dumps(sent)
 
 
@@ -232,7 +232,7 @@ def test_buildroot_names_and_versions_are_cleaned_before_anything(tmp_path: Path
     assert by["busybox"].version == "1.37.0"
     assert "\u2028" not in by["busybox"].local_cpe
     assert "%E2%80%AE" not in (by["busybox"].local_purl or "")
-    sent = slim_bytes(components, stats, project_name="fw").decode("utf-8")
+    sent = upload_bytes(components, stats).decode("utf-8")
     full = json.dumps(build_cyclonedx(components, stats, project_name="fw"))
     for bad in ("\u202e", "\u200b", "\u2028", "\x1b"):
         assert bad not in sent and bad not in full, repr(bad)
@@ -291,8 +291,8 @@ def test_sb1_a_second_tree_keeps_its_manifest_rows(tmp_path: Path) -> None:
 def test_the_local_bill_names_the_buildroot_product(tmp_path: Path) -> None:
     meta = _doc(_tree(tmp_path))["metadata"]["component"]
     assert (meta["name"], meta["version"]) == ("buildroot", "2025.08.2")
-    sent = json.loads(slim_bytes(*collect_components(tmp_path), project_name="fw"))
-    assert sent["metadata"]["component"]["name"] == "fw"
+    sent = json.loads(upload_bytes(*collect_components(tmp_path), product="Steuergerät"))
+    assert sent["metadata"]["component"]["name"] == "buildroot"   # the build's, not --product
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="symbolic links need privileges on Windows")

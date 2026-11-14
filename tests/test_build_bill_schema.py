@@ -24,7 +24,7 @@ from cyclonedx.validation.json import JsonStrictValidator  # noqa: E402
 from test_build_hebel import _tree  # noqa: E402
 
 from jochwacht_sbom.collector import collect_components  # noqa: E402
-from jochwacht_sbom.sbom_out import SPEC_VERSIONS, build_cyclonedx, slim_bytes  # noqa: E402
+from jochwacht_sbom.sbom_out import SPEC_VERSIONS, build_cyclonedx, upload_bytes  # noqa: E402
 
 SCHEMA = {"1.6": SchemaVersion.V1_6, "1.7": SchemaVersion.V1_7}
 EXCERPT = Path(__file__).parent / "fixtures" / "yocto_scarthgap4_excerpt"
@@ -53,6 +53,6 @@ def test_local_bill_and_upload_are_valid(tmp_path: Path, spec: str, make: object
     assert any("components" in c for c in full["components"])  # nested files present
     err = JsonStrictValidator(SCHEMA[spec]).validate_str(json.dumps(full))
     assert err is None, f"local bill, CycloneDX {spec}: {err}"
-    sent = slim_bytes(components, stats, project_name="fw", spec_version=spec).decode()
+    sent = upload_bytes(components, stats, spec_version=spec, release="1.0").decode()
     err = JsonStrictValidator(SCHEMA[spec]).validate_str(sent)
     assert err is None, f"upload, CycloneDX {spec}: {err}"

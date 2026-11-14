@@ -4,7 +4,7 @@ suite-d's finder (``yocto_build.py``) and the shared core
 (``sbom/build_files_yocto.py``) read the build; this file pins what the
 collector writes from it: the LOCAL bill carries the delivered files with
 SHA-512 and their proven properties, the image files as components of type
-file, the creator the build proves. The upload stays names and versions.
+file, the creator the build proves. Since 0.21 the upload is that bill.
 The fixture is the suite's real excerpt of yocto-baum-scarthgap-4.
 """
 
@@ -18,7 +18,7 @@ from typing import Any
 import pytest
 
 from jochwacht_sbom.collector import collect_components
-from jochwacht_sbom.sbom_out import build_cyclonedx, slim_bytes
+from jochwacht_sbom.sbom_out import build_cyclonedx, upload_bytes
 
 EXCERPT = Path(__file__).parent / "fixtures" / "yocto_scarthgap4_excerpt"
 IMAGE = "core-image-minimal-qemux86-64.rootfs-20261113162618"
@@ -59,14 +59,15 @@ def test_each_manifest_package_is_listed_once(scanned: Path) -> None:
     assert base.local_purl.startswith("pkg:")
 
 
-def test_the_upload_stays_names_and_versions(scanned: Path) -> None:
+def test_the_upload_is_the_full_bill_since_0_21(scanned: Path) -> None:
+    """Was: the upload stays names and versions. Ivan, 14.11.2026: the full bill."""
     components, stats = collect_components(scanned)
-    text = slim_bytes(components, stats, project_name="fw").decode("utf-8")
-    for leaked in ("SHA-512", '"hashes"', '"manufacturer"', "jochwacht:evidence",
-                   "component-kind", "bsi:component", IMAGE):
-        assert leaked not in text, leaked
+    text = upload_bytes(components, stats).decode("utf-8")
+    for carried in ("SHA-512", '"hashes"', "jochwacht:evidence", "component-kind",
+                    "bsi:component", IMAGE):
+        assert carried in text, carried
     doc = json.loads(text)
-    assert all("components" not in c for c in doc["components"])
+    assert any("components" in c for c in doc["components"])
     assert {"base-files", "sysvinit-inittab"} <= {c["name"] for c in doc["components"]}
 
 
@@ -137,8 +138,9 @@ def test_the_local_bill_names_the_product_the_build_states(scanned: Path) -> Non
     meta = build_cyclonedx(components, stats, project_name="project")["metadata"]["component"]
     assert (meta["name"], meta["version"]) == (
         read.build.product_name, read.build.product_version) == ("core-image-minimal", "1.0")
-    sent = json.loads(slim_bytes(components, stats, project_name="project"))
-    assert sent["metadata"]["component"]["name"] == "project"
+    sent = json.loads(upload_bytes(components, stats, release="2.0"))
+    assert sent["metadata"]["component"]["name"] == "core-image-minimal"
+    assert sent["metadata"]["component"]["version"] == "2.0"
 
 
 def test_two_builds_name_no_product(scanned: Path, tmp_path: Path) -> None:
