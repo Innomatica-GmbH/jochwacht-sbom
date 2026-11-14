@@ -161,3 +161,20 @@ def test_the_summary_and_readme_say_what_goes_up(tmp_path: Path, monkeypatch: An
                       .read_text(encoding="utf-8").split())
     assert "`--send` uploads the full bill" in readme
     assert "the text of a patch stays on your machine" in readme
+
+
+def test_the_readme_says_when_an_upload_is_unchanged() -> None:
+    """daten, rule live in daten-postgres cf286ae1: the components decide, not the bytes."""
+    readme = " ".join((Path(__file__).resolve().parents[1] / "README.md")
+                      .read_text(encoding="utf-8").split())
+    for sentence in (
+        "Whether an upload is a new version is decided by the components alone "
+        "(name, version, purl, CPE).",
+        "the answer is `unchanged`: no new run, no report, no alarm, and the upload "
+        "does not count against the daily limit.",
+        "the TR-03183 check runs on it again.",
+        "The newest 10 file states of each version are kept;",
+        "a file state that was in force when a report went to the customer is always kept.",
+        "The very same file, byte for byte, sent again creates nothing.",
+    ):
+        assert sentence in readme, sentence
