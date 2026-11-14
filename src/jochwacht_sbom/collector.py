@@ -186,19 +186,20 @@ def _buildroot_build_components(
     """The packages and images of every Buildroot build under *path*.
 
     Read by the shared core (sbom/build_files.py via buildroot_build); the
-    licence is joined with the collector's licence library by the shared rule.
+    licence by the shared rule of TR-03183-2 §6.1 (licenses.buildroot_license).
     Nothing here leaves the house: the build evidence sits in fields that are
     excluded from the payload and from the upload.
     """
-    from jochwacht_sbom.buildroot_build import find_buildroot_builds
-    from jochwacht_sbom.sbom.build_files import BuildrootBuild, join_licenses, read_buildroot_build
-    from jochwacht_sbom.sbom.licenses import normalize_license
-
-    def classify(text: str) -> tuple[str, str] | None:
-        value = normalize_license(text)
-        return (value.kind, value.value) if value is not None else None
+    from jochwacht_sbom.buildroot_build import (
+        buildroot_license_texts,
+        find_buildroot_builds,
+        legal_info_of,
+    )
+    from jochwacht_sbom.sbom.build_files import BuildrootBuild, read_buildroot_build
+    from jochwacht_sbom.sbom.licenses import buildroot_license
 
     builds: list[BuildrootBuild] = []
+    roots_read: list[Path] = []
     try:
         roots = find_buildroot_builds(path)
     except Exception as exc:  # noqa: BLE001 — a finder defect, recorded, not fatal
@@ -217,6 +218,7 @@ def _buildroot_build_components(
         if build is None:
             continue
         builds.append(build)
+        roots_read.append(root)
         read_roots.append(root.resolve())
         where = Path(os.path.relpath(root, path)).as_posix()
         warnings.extend(f"Buildroot build at {where}: {w}" for w in build.warnings)
@@ -233,10 +235,21 @@ def _buildroot_build_components(
         return {k: clean(v) if isinstance(v, str) else v for k, v in dict(patch).items()}
 
     out: list[CheckComponent] = []
-    for build in builds:
+    for build, built_at in zip(builds, roots_read, strict=True):
+        legal_info = legal_info_of(built_at)
         for pb in build.packages:
             pkg = pb.package
-            licence = clean(join_licenses(pkg.licenses, classify=classify) or "")
+            # TR-03183-2 §6.1 by Buildroot's manual (suite-c, coordination
+            # 14.11.2026): an SPDX value, else the build's words as free text;
+            # the parenthesised parts of Buildroot's licence are the scope.
+            folder = (f"{'host-licenses' if pkg.host_reason else 'licenses'}/"
+                      f"{pkg.name}-{pkg.version}" if pkg.version else "")
+            said = buildroot_license(pkg.licenses,
+                                     texts=buildroot_license_texts(legal_info, folder))
+            licence = clean(said.value) if said is not None else ""
+            origin = "buildroot:legal-info/buildroot.cdx.json"
+            if said is not None and said.evidence:
+                origin = f"{origin}; {clean(said.evidence)}"
             out.append(CheckComponent(
                 name=clean(pkg.name), version=clean(pkg.version), ecosystem="buildroot",
                 local_purl="" if _purl_needs_cleaning(pkg.purl) else pkg.purl,
@@ -245,7 +258,10 @@ def _buildroot_build_components(
                 scope="excluded" if pkg.host_reason else "",
                 scope_reason=pb.scope_reason,
                 local_license=licence,
-                local_license_origin="buildroot:legal-info/buildroot.cdx.json" if licence else "",
+                local_license_origin=origin if licence else "",
+                local_license_is_text=bool(said and said.is_text),
+                local_license_by_part=bool(said and said.by_part),
+                local_license_scope=clean(said.scope) if said is not None else "",
                 local_cpe=clean(pkg.cpe), patches=[clean_patch(p) for p in pkg.patches],
                 delivered_files=list(pb.files), not_evidenced=pb.not_evidenced,
                 creator_url=pb.creator.url if pb.creator else "",
@@ -315,6 +331,11 @@ def _build_links_outside(path: Path, *, max_depth: int) -> list[str]:
     return found
 
 
+#: The words of a Yocto build whose image's packages are unknown; the CLI
+#: keys its empty-bill text on them (sicherheit-2 H2).
+YOCTO_SCOPE_UNKNOWN = "the scope of delivery is unknown"
+
+
 def _yocto_build_components(
     path: Path, record_failure: Any, warnings: list[str], read_roots: list[Path],
     products: list[tuple[str, str, str, str]],
@@ -345,7 +366,7 @@ def _yocto_build_components(
         # 14.11.2026): which manifest is the image's is unknown, so no
         # package of it is claimed, and no other manifest decides.
         where = Path(os.path.relpath(tmp, path)).as_posix()
-        warnings.append(f"Yocto build at {where}: the scope of delivery is unknown "
+        warnings.append(f"Yocto build at {where}: {YOCTO_SCOPE_UNKNOWN} "
                         f"({reason}); no package of this build is in the bill, "
                         "the bill of materials is INCOMPLETE")
     out: list[CheckComponent] = []
@@ -838,6 +859,7 @@ def collect_components(
         build_product_kind=products[0][2] if len(products) == 1 else "",
         build_tool_version=strip_control_chars(products[0][3]) if len(products) == 1 else "",
         build_warnings=list(dict.fromkeys(strip_control_chars(w) for w in build_warnings)),
+        yocto_scope_unknown=any(YOCTO_SCOPE_UNKNOWN in w for w in build_warnings),
         buildroot_source_skipped=[
             Path(os.path.relpath(src, path.resolve())).as_posix() for src in br_sources
         ],

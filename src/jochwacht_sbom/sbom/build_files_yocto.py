@@ -754,7 +754,10 @@ def _manifest_paths(tmp: Path) -> list[Path]:
         for image in images:
             path = _image_file(image, "manifest")
             if path is None or not within(path, tmp):
-                name = f"{image.data['IMAGE_NAME']}.manifest"
+                # the first candidate of poky's naming rule, as the build-output
+                # reader names it (sicherheit-2 H1: one file in both lines)
+                candidates = image_file_names(image.data, "manifest")
+                name = candidates[0] if candidates else f"{image.data['IMAGE_NAME']}.manifest"
                 raise ManifestUnreadableError(
                     f"{_printable(name)}: the stated image's manifest is missing")
             paths.append(path)

@@ -72,3 +72,47 @@ def read_buildroot_builds(
         if build is not None:
             builds.append(build)
     return builds
+
+
+#: Bounds of the licence files read per package, the suite's
+#: (importer._buildroot_license_texts, suite-c 883c184).
+MAX_LICENSE_FILES = 64
+MAX_LICENSE_FILE_BYTES = 512 * 1024
+
+
+def legal_info_of(root: Path) -> Path | None:
+    """The legal-info/ that holds the SBOM of a build read at *root*
+    (output/ itself, or an in-tree Buildroot folder around output/)."""
+    for candidate in (root / "legal-info", root / "output" / "legal-info"):
+        if (candidate / "buildroot.cdx.json").is_file() and not candidate.is_symlink():
+            return candidate
+    return None
+
+
+def buildroot_license_texts(legal_info: Path | None, folder: str) -> dict[str, str]:
+    """The licence files legal-info copied for one package
+    (licenses/<name>-<version>/ or host-licenses/…), by path inside that
+    folder; no link, nothing outside it, within the bounds. The same rule as
+    the suite's, so "Public domain" counts in both halves alike."""
+    if legal_info is None or not folder:
+        return {}
+    base = legal_info / folder
+    try:
+        root = base.resolve(strict=True)
+        legal = legal_info.resolve(strict=True)
+    except OSError:
+        return {}
+    if base.is_symlink() or not root.is_dir() or legal not in root.parents:
+        return {}
+    texts: dict[str, str] = {}
+    for f in sorted(root.rglob("*")):
+        if len(texts) >= MAX_LICENSE_FILES:
+            break
+        try:
+            if f.is_symlink() or not f.is_file() or f.stat().st_size > MAX_LICENSE_FILE_BYTES:
+                continue
+            texts[f.relative_to(root).as_posix()] = f.read_text(encoding="utf-8",
+                                                               errors="replace")
+        except OSError:
+            continue
+    return texts

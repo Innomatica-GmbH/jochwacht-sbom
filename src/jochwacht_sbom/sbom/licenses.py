@@ -270,7 +270,7 @@ def normalize_license(
         # An expression only when every part is valid SPDX (13.11.2026).
         strict = _strict_expression(text)
         if strict is not None:
-            return LicenseValue("expression", strict)
+            return LicenseValue("expression", _current_ids(strict))
         if _OPERATOR.search(text):
             return LicenseValue("name", " ".join(text.split()))
 
@@ -286,18 +286,30 @@ def normalize_license(
         # make the whole document invalid rather than merely imprecise.
         canonical = _spdx_identifiers().get(text.lower())
         if canonical is not None:
-            return LicenseValue("id", canonical)
+            return LicenseValue("id", _current_ids(canonical))
 
     if callable(lookup):
         mapped = lookup(text)
         if isinstance(mapped, str) and mapped.strip():
             canonical = _spdx_identifiers().get(mapped.strip().lower())
             if canonical is not None:
-                return LicenseValue("id", canonical)
+                return LicenseValue("id", _current_ids(canonical))
             return LicenseValue("name", mapped.strip())
 
     # A statement we cannot turn into an identifier is kept as what it is.
     return LicenseValue("name", text)
+
+
+def _current_ids(value: str) -> str:
+    """*value* (an SPDX id or a strict expression) with each deprecated id that has
+    one current id of the identical full name replaced by it (GPL-2.0 ->
+    GPL-2.0-only, GPL-2.0+ -> GPL-2.0-or-later; data/spdx_deprecated_replacements.yaml,
+    the SPDX list itself). A deprecated id without such a replacement (AGPL-3.0)
+    is left as it is: its scope is not stated, never guessed (coordination,
+    14.11.2026: our own enrichment must not turn a customer's SBOM yellow)."""
+    replacement = _deprecated_replacements()
+    return " ".join(replacement.get(tok, tok) for tok in _EXPR_TOKEN.findall(value)) \
+        .replace("( ", "(").replace(" )", ")")
 
 
 def cyclonedx_licenses(
@@ -500,3 +512,239 @@ def yocto_license(raw: str | None) -> tuple[str, bool] | None:
         return None
     expression = yocto_license_expression(text)
     return (expression, False) if expression is not None else (text, True)
+
+
+# --- Buildroot: <PKG>_LICENSE by the manual of the version built ---------------------
+#
+# Coordination, 14.11.2026 (TR-03183-2 §6.1). Buildroot's manual (2025.08.2,
+# docs/manual/adding-packages-generic.adoc, <PKG>_LICENSE): an SPDX short
+# identifier where the licence is on the SPDX list, else a precise description;
+# a comma separates different parts under different licences (all apply: AND);
+# a component in parentheses names the part (kept as the scope, never dropped);
+# "or" separates the licences of a dual-licensed package (OR); "unknown" when
+# the variable is not set (no statement).
+
+#: A component of the package, in parentheses at the end of a licence.
+_BR_SCOPE = re.compile(r"^(?P<name>.*?)\s*\((?P<scope>[^()]*)\)\s*$")
+#: Buildroot's keyword for a dual licence (lower case, as the manual writes it).
+_BR_OR = re.compile(r"\s+or\s+")
+#: "<licence> with <exception>" where the exception is named.
+_BR_WITH = re.compile(r"^(?P<lic>\S+)\s+with\s+(?P<exc>\S+)$", re.IGNORECASE)
+#: Buildroot writes this when <PKG>_LICENSE is not set: no statement.
+_BR_UNKNOWN = "unknown"
+#: Named rule (coordination, 14.11.2026): "A (part) / B (part)", licences of
+#: different components separated by a slash, is the manual's comma: AND.
+_BR_SLASH = re.compile(r"^(?P<a>[^/]+\([^()]*\))\s*/\s*(?P<b>[^/]+\([^()]*\))$")
+#: Named rule (coordination, 14.11.2026): "Dual A/B" is the manual's "A or B".
+_BR_DUAL = re.compile(r"^Dual\s+(?P<a>[^\s/]+)\s*/\s*(?P<b>[^\s/]+)$")
+#: A name that states public domain; it counts only with a dedication in the
+#: package's own licence files (coordination, 14.11.2026).
+_BR_PUBLIC_DOMAIN = frozenset({"public domain"})
+_PD_REF = "LicenseRef-scancode-public-domain"
+_SENTENCE = re.compile(r"[^.!?]*\bpublic\s+domain\b[^.!?]*[.!?]?", re.IGNORECASE)
+#: PD1 (sicherheit-2 on 883c184): a dedication is stated positively ("is in
+#: the public domain", "placed / released / dedicated ... into the public
+#: domain", "is public domain"), never only mentioned ...
+_DEDICATION = re.compile(
+    r"\b(?:is|are)\s+(?:in(?:to)?\s+the\s+)?public\s+domain\b"
+    r"|\b(?:placed|released|put|dedicat\w*|contributed)\b[^.!?]{0,80}?"
+    r"\b(?:in|into|to)\s+the\s+public\s+domain\b",
+    re.IGNORECASE)
+#: ... and nothing in the sentence takes it back (not, isn't, cannot,
+#: disclaim ...).
+_NEGATION = re.compile(
+    r"\b(?:not|no|never|neither|nor|cannot|without)\b|n't\b|\bdisclaim\w*",
+    re.IGNORECASE)
+
+
+class BuildrootLicense(NamedTuple):
+    """The licence of a Buildroot package: an SPDX value (``is_text`` False)
+    or the build's own words (``is_text`` True, written as free text and red);
+    ``scope`` the components Buildroot names in parentheses, "" for none."""
+
+    value: str
+    is_text: bool
+    scope: str
+    #: What a licence text of the package proved, quoted ("" for none):
+    #: "public domain: libtomcrypt/LICENSE: 'LibTomCrypt is public domain.'".
+    evidence: str = ""
+    #: The licence is stated by part (more than one comma part, or a component
+    #: named): which part a single file is, the file list does not prove, so a
+    #: file inherits no value (BR2, sicherheit-2 on 8cbf2f9). "A or B" alone is a
+    #: choice for the whole package and is inherited.
+    by_part: bool = False
+
+
+@lru_cache(maxsize=1)
+def _deprecated_replacements() -> dict[str, str]:
+    """Deprecated SPDX id -> the one current id of the identical full name
+    (data/spdx_deprecated_replacements.yaml, from the SPDX list itself)."""
+    raw = yaml.safe_load(
+        (_DATA_DIR / "spdx_deprecated_replacements.yaml").read_text(encoding="utf-8"))
+    return {str(k): str(v["current"]) for k, v in (raw.get("replacements") or {}).items()}
+
+
+@lru_cache(maxsize=1)
+def _buildroot_license_map() -> dict[str, str]:
+    """Curated Buildroot name -> SPDX value (data/buildroot_license_map.yaml);
+    an entry counts only when it holds: tier spdx a current SPDX value, tier
+    scancode a reference of the checked-in key list."""
+    path = _DATA_DIR / "buildroot_license_map.yaml"
+    if not path.is_file():
+        return {}
+    table = yaml.safe_load(path.read_text(encoding="utf-8"))
+    refs = _scancode_refs()
+    out: dict[str, str] = {}
+    for name, entry in (table.get("entries") or {}).items():
+        value, tier = str(entry["value"]), entry["tier"]
+        if (tier == "spdx" and _current_expression(value) == value) or (
+                tier == "scancode" and value in refs):
+            out[str(name)] = value
+    return out
+
+
+def buildroot_parts(raw: str) -> list[str]:
+    """A manifest.csv LICENSE value split at the commas outside parentheses."""
+    parts, depth, cur = [], 0, ""
+    for ch in raw:
+        depth += (ch == "(") - (ch == ")")
+        if ch == "," and depth == 0:
+            parts.append(cur)
+            cur = ""
+        else:
+            cur += ch
+    parts.append(cur)
+    return [p.strip() for p in parts if p.strip()]
+
+
+def _buildroot_name(name: str) -> str | None:
+    """The SPDX value of one Buildroot licence name, or None."""
+    text = name.strip()
+    ids, deprecated = _spdx_identifiers(), _spdx_deprecated()
+    canonical = ids.get(text.lower())
+    if canonical is not None:
+        return _deprecated_replacements().get(canonical) if canonical in deprecated else canonical
+    if text.endswith("+"):
+        base = ids.get(text[:-1].lower())
+        if base is not None and base not in deprecated:
+            return base + "+"  # the SPDX "or later" operator on a current id
+    m = _BR_WITH.match(text)
+    if m is not None:
+        lic, exc = _buildroot_name(m["lic"]), _spdx_exceptions().get(m["exc"].lower())
+        if lic is not None and exc is not None and " " not in lic:
+            return f"{lic} WITH {exc}"
+    return _buildroot_license_map().get(text)
+
+
+def public_domain_statement(texts: dict[str, str] | None) -> str:
+    """The first sentence of the package's licence files that dedicates code to
+    the public domain: stated positively, nothing in it taking it back (PD1); as
+    "<file>: '<sentence>'"; "" for none."""
+    for rel, text in sorted((texts or {}).items()):
+        for m in _SENTENCE.finditer(" ".join(text.split())):
+            sentence = m.group(0).strip()
+            if sentence and _DEDICATION.search(sentence) and not _NEGATION.search(sentence):
+                return f"{rel}: '{sentence[:200]}'"
+    return ""
+
+
+def _buildroot_split(part: str) -> tuple[list[str], str]:
+    """A part as (alternatives, how they join): the manual's "or", and the named
+    rules "A (x) / B (y)" (AND) and "Dual A/B" (OR)."""
+    m = _BR_SLASH.match(part)
+    if m is not None:
+        return [m["a"].strip(), m["b"].strip()], "AND"
+    m = _BR_DUAL.match(part)
+    if m is not None:
+        return [m["a"], m["b"]], "OR"
+    return _BR_OR.split(part), "OR"
+
+
+def buildroot_license(parts: list[str] | tuple[str, ...] | str, *,
+                      texts: dict[str, str] | None = None) -> BuildrootLicense | None:
+    """The licence of a Buildroot package from its licence parts (the entries of
+    buildroot.cdx.json, or the manifest.csv value), or None when none is stated.
+
+    By the manual: parts are AND, ``or`` within a part is OR, a component in
+    parentheses becomes the scope. A name resolves to a current SPDX id, a
+    deprecated id to its replacement of the identical name, ``X+`` to the SPDX
+    operator, ``A with <exception>`` to WITH, otherwise only through an
+    evidenced entry. "Public domain" counts (ScanCode public-domain) only when
+    *texts*, the package's licence files from legal-info, dedicate code to the
+    public domain; the sentence is quoted in ``evidence``. If one name does not
+    resolve, the whole licence stays the build's own words (free text, red):
+    never a partial green.
+    """
+    raw_parts = [p.strip() for p in (buildroot_parts(parts) if isinstance(parts, str)
+                                     else list(parts)) if p.strip()]
+    placeholder = [spdx_license_value(p) is None or p == _BR_UNKNOWN for p in raw_parts]
+    if all(placeholder):
+        return None  # the whole value states nothing
+    stated = raw_parts
+    if any(placeholder):
+        # BR1 (sicherheit-2 on 8cbf2f9): each comma part is a part of the package;
+        # "unknown" or a placeholder for one of them leaves it unproven: the
+        # whole licence stays the build's words, never a partial green
+        return BuildrootLicense("; ".join(stated), True, "", by_part=True)
+    groups: list[str] = []
+    scopes: list[tuple[str, str, str]] = []  # (value, name as written, component)
+    resolved = True
+    evidence = ""
+    for part in stated:
+        alts: list[str] = []
+        pieces, joiner = _buildroot_split(part)
+        for alt in pieces:
+            m = _BR_SCOPE.match(alt)
+            name, scope = (m["name"], m["scope"].strip()) if m else (alt, "")
+            value = _buildroot_name(name)
+            if value is None and name.strip().casefold() in _BR_PUBLIC_DOMAIN:
+                quote = public_domain_statement(texts)
+                if quote:
+                    value, evidence = _PD_REF, f"public domain: {quote}"
+            if value is None:
+                resolved = False
+            if scope:
+                scopes.append((value or "", name.strip(), scope))
+            alts.append(value or "")
+        if resolved:
+            groups.append(alts[0] if len(alts) == 1 else "(" + f" {joiner} ".join(alts) + ")")
+    # the scope in the same words as the value: SPDX when resolved, else the build's
+    scope = "; ".join(f"{v if resolved else n} ({s})" for v, n, s in scopes)
+    if resolved:
+        joined = " AND ".join(
+            g if len(groups) == 1 or " " not in g or g.startswith("(") else f"({g})"
+            for g in groups)
+        if len(groups) == 1 and joined.startswith("(") and joined.endswith(")"):
+            joined = joined[1:-1]
+        expression = _strict_expression(joined)
+        if expression is not None and _current_expression(expression) == expression:
+            return BuildrootLicense(expression, False, scope, evidence,
+                                    by_part=len(stated) > 1 or bool(scopes))
+    return BuildrootLicense("; ".join(stated), True, scope,
+                            by_part=len(stated) > 1 or bool(scopes))
+
+
+class DeprecatedIds(NamedTuple):
+    """The deprecated SPDX ids in a licence value (coordination, 14.11.2026):
+    ``replaced`` those with one current id of the same name (id, current) are
+    taken, but named (yellow); ``unreplaced`` the others leave the scope
+    (-only/-or-later) unnamed (red)."""
+
+    replaced: list[tuple[str, str]]
+    unreplaced: list[str]
+
+
+def deprecated_ids(value: str | None) -> DeprecatedIds:
+    """The deprecated SPDX ids of *value*, by whether a replacement exists."""
+    strict = _strict_expression(value) if value else None
+    if strict is None:
+        return DeprecatedIds([], [])
+    deprecated, replacement = _spdx_deprecated(), _deprecated_replacements()
+    toks = sorted({tok for tok in _EXPR_TOKEN.findall(strict) if tok in deprecated})
+    return DeprecatedIds([(t, replacement[t]) for t in toks if t in replacement],
+                         [t for t in toks if t not in replacement])
+
+
+def deprecated_without_replacement(value: str | None) -> list[str]:
+    """The deprecated SPDX ids in *value* without a current id of the same name."""
+    return deprecated_ids(value).unreplaced

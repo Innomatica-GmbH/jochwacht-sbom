@@ -82,6 +82,12 @@ class CheckComponent(BaseModel):
     #: The build's own words that no tier of TR-03183-2 §6.1 resolves (Yocto):
     #: written as license.name, never as an identifier.
     local_license_is_text: bool = Field(default=False, exclude=True)
+    #: The components Buildroot names in parentheses ("GPL-2.0-or-later
+    #: (programs); LGPL-2.1-or-later (libraries)"), written as a property.
+    local_license_scope: str = Field(default="", exclude=True)
+    #: Buildroot names several parts (sicherheit-2 BR2): which part a delivered
+    #: file falls under is not stated, so no licence is claimed for the file.
+    local_license_by_part: bool = Field(default=False, exclude=True)
     local_cpe: str = Field(default="", exclude=True)
     patches: list[dict[str, Any]] = Field(default_factory=list, exclude=True)
     delivered_files: list[Any] = Field(default_factory=list, exclude=True)
@@ -114,6 +120,9 @@ class CheckStats(BaseModel):
     #: rootfs over the reading limit, hard links, files without a package,
     #: unreadable feeds). Local only: shown, never sent (sicherheit-2 SY1).
     build_warnings: list[str] = Field(default_factory=list, exclude=True)
+    #: A Yocto build was found whose image's packages are unknown (manifest
+    #: missing or testdata.json unusable): the empty-bill text names that.
+    yocto_scope_unknown: bool = Field(default=False, exclude=True)
     #: (name, version) of the product when exactly one build directory was
     #: read and names it (Buildroot's metadata.component, Yocto's image
     #: recipe): the local bill's metadata.component, as the suite writes it.

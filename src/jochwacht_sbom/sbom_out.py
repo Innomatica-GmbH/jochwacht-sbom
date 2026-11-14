@@ -109,6 +109,9 @@ def _with_build_evidence(
             if isinstance(props, list):
                 props.append({"name": properties.name("evidence:license"),
                               "value": comp.local_license_origin})
+                if comp.local_license_scope:
+                    props.append({"name": properties.name("license-scope"),
+                                  "value": comp.local_license_scope})
     if comp.local_cpe and "cpe" not in entry:
         entry["cpe"] = comp.local_cpe
     if comp.patches:
@@ -116,7 +119,12 @@ def _with_build_evidence(
     if comp.delivered_files:
         entry["components"] = cdx_files.file_components(
             comp.delivered_files, parent_ref=ref, package_name=comp.name,
-            version=comp.version, package_license=comp.local_license or comp.license,
+            # BR2: "; by part" makes the shared rule (cdx_files.LICENSE_BY_PART)
+            # claim no licence for the file, as the suite's generator does
+            version=comp.version,
+            package_license=(f"{comp.local_license}; by part"
+                             if comp.local_license and comp.local_license_by_part
+                             else comp.local_license or comp.license),
             to_licenses=lambda text: cyclonedx_licenses(
                 text, as_text=comp.local_license_is_text and text == comp.local_license))
     cdx_files.apply_creator(entry, package_name=comp.name, url=comp.creator_url,

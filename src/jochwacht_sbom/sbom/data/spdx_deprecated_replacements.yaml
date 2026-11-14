@@ -1,0 +1,26 @@
+# Deprecated SPDX identifiers and their current replacement, from the SPDX
+# License List itself: a deprecated id maps to the one current id that carries
+# the identical full name (GPL-2.0+ 'GNU General Public License v2.0 or later'
+# -> GPL-2.0-or-later). A deprecated id without exactly one such current id
+# (AGPL-3.0, GFDL-1.x, the '-with-...-exception' ids, eCos-2.0, ...) has no
+# entry: its replacement is not stated by name and is never guessed.
+#
+# SOURCE: spdx/license-list-data v3.28.0, json/licenses.json
+#   sha256 f728c534d8bd1044fc515a2ddb2292be99559021d830bfa3281be0bcd36302ee
+#   (release tarball sha256 52375a91b28b5f6f3142c4b3a555086482f1e09be68c4fa7fdbf377d37afa340;
+#   read by suite-c, 14.11.2026, released by the coordination).
+license_list_version: "3.28.0"
+replacements:
+  "GPL-1.0": {current: "GPL-1.0-only", name: "GNU General Public License v1.0 only"}
+  "GPL-1.0+": {current: "GPL-1.0-or-later", name: "GNU General Public License v1.0 or later"}
+  "GPL-2.0": {current: "GPL-2.0-only", name: "GNU General Public License v2.0 only"}
+  "GPL-2.0+": {current: "GPL-2.0-or-later", name: "GNU General Public License v2.0 or later"}
+  "GPL-3.0": {current: "GPL-3.0-only", name: "GNU General Public License v3.0 only"}
+  "GPL-3.0+": {current: "GPL-3.0-or-later", name: "GNU General Public License v3.0 or later"}
+  "LGPL-2.0": {current: "LGPL-2.0-only", name: "GNU Library General Public License v2 only"}
+  "LGPL-2.0+": {current: "LGPL-2.0-or-later", name: "GNU Library General Public License v2 or later"}
+  "LGPL-2.1": {current: "LGPL-2.1-only", name: "GNU Lesser General Public License v2.1 only"}
+  "LGPL-2.1+": {current: "LGPL-2.1-or-later", name: "GNU Lesser General Public License v2.1 or later"}
+  "LGPL-3.0": {current: "LGPL-3.0-only", name: "GNU Lesser General Public License v3.0 only"}
+  "LGPL-3.0+": {current: "LGPL-3.0-or-later", name: "GNU Lesser General Public License v3.0 or later"}
+  "StandardML-NJ": {current: "SMLNJ", name: "Standard ML of New Jersey License"}

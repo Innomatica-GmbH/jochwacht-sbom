@@ -140,6 +140,40 @@ def find_build_output(path: Path, *, max_depth: int = 5) -> tuple[list[Path], li
     return manifests, legal_dirs
 
 
+def find_yocto_image_folders(path: Path, *, max_depth: int = 5) -> list[Path]:
+    """Yocto image folders (``<TMPDIR>/deploy/images/<machine>``) under *path*
+    that hold a regular ``*.testdata.json``, with or without a manifest.
+
+    sicherheit-2 H2 (14.11.2026): a build whose image states itself but has no
+    manifest at all is still a Yocto build; finding it only through its
+    manifests made it vanish. The same walk rules as find_build_output.
+    """
+    found: list[Path] = []
+    root = path.resolve()
+
+    def _walk(current: Path, depth: int) -> None:
+        if depth > max_depth:
+            return
+        try:
+            entries = sorted(current.iterdir())
+        except OSError:
+            return
+        if current.parent.name == "images" and current.parent.parent.name == "deploy" \
+                and any(e.name.endswith(".testdata.json") and e.is_file()
+                        and not e.is_symlink() for e in entries):
+            found.append(current)
+        for entry in entries:
+            if not _inside(entry, root) or not entry.is_dir() or entry.is_symlink():
+                continue
+            if entry.name.startswith(".") or entry.name in ("sources", "host-sources",
+                                                             "legal-info"):
+                continue
+            _walk(entry, depth + 1)
+
+    _walk(path, 0)
+    return found
+
+
 def _stated_candidates(folder: Path) -> list[tuple[str, list[str]]] | None:
     """Per regular ``*.testdata.json`` in *folder* (the dated file; the
     undated name is a link): its name and the candidate names of its

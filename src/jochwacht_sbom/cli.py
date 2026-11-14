@@ -487,8 +487,19 @@ def _run(  # noqa: PLR0913 — mirrors the CLI surface
         # An empty report is the worst possible answer — but WHY it is empty
         # differs, and telling a CMake customer "no build system found" when
         # their CMakeLists.txt was read is the Befund-42 mistake (describing
-        # the tool, not their project). Three cases, three texts.
-        if stats.build_files_scanned == 0:
+        # the tool, not their project). Three cases, three texts — and a
+        # fourth: a Yocto build that was found, but whose image's packages are
+        # unknown (sicherheit-2 H2), is not "no build system".
+        if stats.yocto_scope_unknown:
+            console.print(
+                "[yellow]A Yocto build was found, but which packages its image "
+                "installs is unknown[/yellow] (named above): the bill lists none "
+                "of them and is INCOMPLETE.\n"
+                "Keep the image's manifest beside its testdata.json in "
+                "deploy/images/<machine>/, as bitbake writes them, and re-run.",
+                soft_wrap=True,
+            )
+        elif stats.build_files_scanned == 0:
             console.print(
                 "[yellow]No supported build system found in this directory."
                 "[/yellow]\n"

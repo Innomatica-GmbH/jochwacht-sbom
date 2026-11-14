@@ -158,7 +158,9 @@ def test_the_binary_carries_the_spdx_lists() -> None:
         "spdx_license_ids.yaml", "spdx_exception_ids.yaml",
         # the Yocto licence in the order of TR-03183-2 §6.1 (0.21)
         "yocto_license_map.yaml", "scancode_license_refs.yaml",
-        "openembedded_common_licenses.yaml"}
+        "openembedded_common_licenses.yaml",
+        # Buildroot's licence by §6.1 (0.21, suite-c)
+        "buildroot_license_map.yaml", "spdx_deprecated_replacements.yaml"}
 
 
 def test_licence_text_that_is_not_valid_spdx_stays_text() -> None:
@@ -169,8 +171,10 @@ def test_licence_text_that_is_not_valid_spdx_stays_text() -> None:
     for raw in ("GPL-3.0+ with exceptions", "EPL-2.0 or EDLv1.0", "BSD-3-Clause or GPL-2.0"):
         got = cyclonedx_licenses(raw)
         assert "expression" not in got[0] or raw == "BSD-3-Clause or GPL-2.0", (raw, got)
+    # suite-c 7ae2eb6: a deprecated id is written as its replacement of the
+    # identical full name (GPL-2.0 -> GPL-2.0-only), also inside an expression
     assert cyclonedx_licenses("BSD-3-Clause or GPL-2.0") == [
-        {"expression": "BSD-3-Clause OR GPL-2.0"}]
+        {"expression": "BSD-3-Clause OR GPL-2.0-only"}]
 
 
 def _in_tree(root: Path) -> Path:

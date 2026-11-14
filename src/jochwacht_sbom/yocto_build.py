@@ -22,7 +22,7 @@ from jochwacht_sbom.sbom.build_files_yocto import (
     yocto_build,
     yocto_manifest_entries,
 )
-from jochwacht_sbom.sbom.buildoutput import find_build_output
+from jochwacht_sbom.sbom.buildoutput import find_build_output, find_yocto_image_folders
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -52,9 +52,12 @@ def find_yocto_builds(path: Path) -> list[Path]:
     folder counts when it also holds ``pkgdata/`` and lies inside *path*.
     """
     manifests, _ = find_build_output(path)
+    # sicherheit-2 H2: an image folder that states itself (testdata.json) but
+    # holds no manifest is a Yocto build too; its gap is named, never missed.
+    folders = [m.parent for m in manifests] + find_yocto_image_folders(path)
     found: list[Path] = []
-    for manifest in manifests:
-        parents = manifest.parents
+    for folder in folders:
+        parents = [folder, *folder.parents]
         if len(parents) < 4:
             continue
         tmp = parents[3]

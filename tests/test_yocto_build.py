@@ -60,7 +60,20 @@ def test_read_with_the_manifest_names(scanned: Path) -> None:
     assert [r.path for r in read.build.images] == [f"{IMAGE}.tar.bz2"]
 
 
-def test_without_a_manifest_there_is_no_build(scanned: Path) -> None:
+def test_without_a_manifest_the_stated_image_is_a_gap(scanned: Path) -> None:
+    """Was: without a manifest there is no build. sicherheit-2 H2 (14.11.2026):
+    an image that states itself in testdata.json is a Yocto build whose
+    scope of delivery is unknown, named as a gap, never missed."""
     for p in (scanned / "build/tmp/deploy/images").rglob("*.manifest"):
         p.unlink()
-    assert read_yocto_builds(scanned) == []
+    gaps: list[tuple[Path, str]] = []
+    assert read_yocto_builds(scanned, gaps) == []
+    assert [(t.name, "manifest is missing" in r) for t, r in gaps] == [("tmp", True)]
+
+
+def test_without_manifest_and_testdata_there_is_no_build(scanned: Path) -> None:
+    images = scanned / "build/tmp/deploy/images"
+    for p in [*images.rglob("*.manifest"), *images.rglob("*.testdata.json")]:
+        p.unlink()
+    gaps: list[tuple[Path, str]] = []
+    assert read_yocto_builds(scanned, gaps) == [] and gaps == []

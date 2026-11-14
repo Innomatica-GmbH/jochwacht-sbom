@@ -1,0 +1,24 @@
+# Buildroot licence names that are no SPDX identifier, with the value we write
+# and the evidence for it (TR-03183-2 §6.1; coordination, 14.11.2026).
+#
+# Buildroot's convention (manual of the version built, docs/manual/
+# adding-packages-generic.adoc, <PKG>_LICENSE, Buildroot 2025.08.2 = commit
+# 645f6f48241229869bf0eb08f279ed657403a116, file sha256
+# 96e8c6664ff7495ab1757a86b0b317eb4052ee60ea6368c51a6307d535dbb7cb): an SPDX short
+# identifier where the licence is on the SPDX list, otherwise a precise
+# description; comma = different parts under different licences; a component
+# in parentheses; "or" = dual licensed; "unknown" when not set. A name that is
+# no SPDX identifier becomes an SPDX value or a ScanCode reference only
+# through an entry here, measured on the build's own licence text
+# (legal-info/licenses/<pkg>-<version>/...). Never by the name alone.
+spdx_license_list_version: "3.28.0"
+scancode_licensedb_commit: "f10c818a2fbf0cd57a7c1b6cadd86a863408183c"
+entries:
+  "EDLv1.0":
+    tier: spdx
+    value: "BSD-3-Clause"
+    evidence: "Build text legal-info/licenses/mosquitto-2.0.22/edl-v10 (Buildroot 2025.08.2 zc706, sha256 86fc4a3f97cb769c04e8da557036c1066eb8bb22b2d0a5dd31464990fe84047c; the Eclipse Distribution License v1.0, byte-equal after normalisation to poky's common-licenses/EDL-1.0) matches the SPDX 3.28.0 template BSD-3-Clause (template sha256 c42368b683ceef1ad41b6f17999adf3b7534e3c47fbdd51449ed6690edb1fc5f) as a whole by the SPDX License List Matching Guidelines, applied strictly; the vars take the title line with the Eclipse copyright and the organisation's name (28.5% of the normalised text)."
+  "bzip2-1.0.4":
+    tier: scancode
+    value: "LicenseRef-scancode-bzip2-libbzip-1.0.4"
+    evidence: "Build text legal-info/licenses/busybox-1.37.0/archival/libarchive/bz/LICENSE (Buildroot 2025.08.2 zc706, sha256 b5a136ed67798e51fe2e0ca0b2a21cb01b904ff0c9f7d563a6292e276607e58f) is one leading sentence of busybox ('bzip2 applet in busybox is based on lightly-modified source of bzip2 version 1.0.4. bzip2 source is distributed under the following conditions:') followed word for word, after normalisation, by the ScanCode text of key bzip2-libbzip-1.0.4 (LicenseDB f10c818, docs/bzip2-libbzip-1.0.4.LICENSE sha256 3bf94ae164e61eb6f4186d7463085f7b6232f5e5ca045248ff13311f8e3815c2, front matter removed). No SPDX template matches: bzip2-1.0.6 diverges at 'Julian Seward, Cambridge, UK.' (as for poky's bzip2-1.0.4)."
