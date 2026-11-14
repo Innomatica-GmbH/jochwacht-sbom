@@ -3,4 +3,4 @@
 GPL-3.0-or-later, Copyright (C) 2026 Innomatica GmbH.
 """
 
-__version__ = "0.19.0"
+__version__ = "0.20.0"
