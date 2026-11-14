@@ -7,3 +7,6 @@ build/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+
+# A run of the collector on its own checkout writes its bill here (removed 14.11.2026).
+/sbom.cdx*.json
