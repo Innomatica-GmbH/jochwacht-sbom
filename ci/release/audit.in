@@ -1,0 +1,2 @@
+# The release gate itself (ci/release/README.md).
+pip-audit

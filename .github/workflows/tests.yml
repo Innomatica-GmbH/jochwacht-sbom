@@ -3,6 +3,23 @@ on:
   push: { branches: [main] }
   pull_request:
 jobs:
+  # The release gate must stop a vulnerable state (coordination, 14.11.2026):
+  # a dry run of ci/release/gate.sh on a deliberately vulnerable lock, and on
+  # the real release locks, which must pass.
+  release-gate:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install --require-hashes -r ci/release/audit.txt
+      - name: a vulnerable lock stops the gate
+        run: |
+          if sh ci/release/gate.sh -r ci/release/selftest-vulnerable.txt; then
+            echo "::error::the release gate let a vulnerable lock through"; exit 1
+          fi
+      - name: the release locks pass the gate
+        run: sh ci/release/gate.sh -r ci/release/runtime.txt -r ci/release/build.txt
   test:
     # Our audience is hybrid: a .NET developer sits in front of Windows. The
     # collector had never run there (order idee-fehlerrueckmeldung-sammler,

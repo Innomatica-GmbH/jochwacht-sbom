@@ -3,7 +3,19 @@ on:
   push:
     tags: ["v*"]
 jobs:
+  # The release gate (Ivan, 14.11.2026): nothing is published while a library
+  # of the wheel's resolution or of the binary has a known vulnerability.
+  # Both upload jobs need it; there is no exception list (ci/release/gate.sh).
+  gate:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install --require-hashes -r ci/release/audit.txt
+      - run: sh ci/release/gate.sh -r ci/release/runtime.txt -r ci/release/build.txt
   pypi:
+    needs: gate
     runs-on: ubuntu-latest
     environment: pypi
     permissions: { id-token: write }   # PyPI Trusted Publishing
@@ -11,23 +23,36 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
-      - run: pip install build && python -m build
+      # The build backend from the lock, not whatever the index has today.
+      - run: pip install --require-hashes -r ci/release/build.txt
+      - run: python -m build --no-isolation
       - uses: pypa/gh-action-pypi-publish@release/v1
   # The forwarding shell jochwacht-sbom 0.9.0 was published once (its last
   # release); PyPI refuses re-uploads, so that job is gone.
   binary:
+    needs: gate
     runs-on: ubuntu-22.04   # aeltere glibc = laeuft auf mehr Zielsystemen
     permissions: { contents: write }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
-      - run: pip install . pyinstaller
+      # Exactly the audited state: every library pinned with its hashes, the
+      # tool itself without resolving anything.
+      - run: pip install --require-hashes -r ci/release/runtime.txt -r ci/release/build.txt
+      - run: pip install --no-deps --no-build-isolation .
       - run: pyinstaller jochwacht-sbom.spec --clean --noconfirm
       - run: |
-          BIN=jochwacht-sbom-${GITHUB_REF_NAME#v}-linux-x86_64
+          VERSION=${GITHUB_REF_NAME#v}
+          BIN=jochwacht-sbom-$VERSION-linux-x86_64
           mv dist/jochwacht-sbom "dist/$BIN"
-          ( cd dist && sha256sum "$BIN" > "$BIN.sha256" )
+          # The binary's own SBOM: Python and every bundled library, from
+          # PyInstaller's table of contents and this locked environment.
+          python ci/release/binary_sbom.py --toc build/jochwacht-sbom \
+            --binary "dist/$BIN" --lock ci/release/runtime.txt --lock ci/release/build.txt \
+            --version "$VERSION" -o "dist/$BIN.cdx.json"
+          ( cd dist && sha256sum "$BIN" > "$BIN.sha256" \
+                    && sha256sum "$BIN.cdx.json" > "$BIN.cdx.json.sha256" )
       - uses: softprops/action-gh-release@v2
         with:
           name: jochwacht-sbom ${{ github.ref_name }}

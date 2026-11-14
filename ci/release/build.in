@@ -1,0 +1,4 @@
+# What the binary and wheel builds need besides the runtime (ci/release/README.md).
+pyinstaller
+build
+hatchling

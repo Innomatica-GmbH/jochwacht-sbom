@@ -1,0 +1,2 @@
+# Deliberately vulnerable: the release gate must stop on it (ci/release/README.md).
+requests==2.19.1
