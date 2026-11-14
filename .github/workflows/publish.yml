@@ -2,6 +2,9 @@ name: publish
 on:
   push:
     tags: ["v*"]
+# Every action is pinned to a full commit SHA (sicherheit-2, 14.11.2026): a
+# moved tag must not run with the rights to publish. The comment names the
+# tag the SHA was taken from.
 jobs:
   # The release gate (Ivan, 14.11.2026): nothing is published while a library
   # of the wheel's resolution or of the binary has a known vulnerability.
@@ -9,8 +12,8 @@ jobs:
   gate:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
         with: { python-version: "3.12" }
       - run: pip install --require-hashes -r ci/release/audit.txt
       - run: sh ci/release/gate.sh -r ci/release/runtime.txt -r ci/release/build.txt
@@ -20,13 +23,13 @@ jobs:
     environment: pypi
     permissions: { id-token: write }   # PyPI Trusted Publishing
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
         with: { python-version: "3.12" }
       # The build backend from the lock, not whatever the index has today.
       - run: pip install --require-hashes -r ci/release/build.txt
       - run: python -m build --no-isolation
-      - uses: pypa/gh-action-pypi-publish@release/v1
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086  # release/v1
   # The forwarding shell jochwacht-sbom 0.9.0 was published once (its last
   # release); PyPI refuses re-uploads, so that job is gone.
   binary:
@@ -34,8 +37,8 @@ jobs:
     runs-on: ubuntu-22.04   # aeltere glibc = laeuft auf mehr Zielsystemen
     permissions: { contents: write }
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
         with: { python-version: "3.12" }
       # Exactly the audited state: every library pinned with its hashes, the
       # tool itself without resolving anything.
@@ -53,7 +56,7 @@ jobs:
             --version "$VERSION" -o "dist/$BIN.cdx.json"
           ( cd dist && sha256sum "$BIN" > "$BIN.sha256" \
                     && sha256sum "$BIN.cdx.json" > "$BIN.cdx.json.sha256" )
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65  # v2
         with:
           name: jochwacht-sbom ${{ github.ref_name }}
           body_path: .github/release-notes/${{ github.ref_name }}.md

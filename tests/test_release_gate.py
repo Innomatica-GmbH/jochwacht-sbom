@@ -206,3 +206,13 @@ def test_a_module_of_no_distribution_fails(tmp_path: Path) -> None:
 def test_the_readme_says_where_the_binary_sbom_is() -> None:
     readme = " ".join((ROOT / "README.md").read_text(encoding="utf-8").split())
     assert "`jochwacht-sbom-<version>-linux-x86_64.cdx.json`" in readme
+
+
+@pytest.mark.parametrize("workflow", ["publish.yml", "publish-placeholder.yml", "tests.yml"])
+def test_every_action_is_pinned_to_a_commit(workflow: str) -> None:
+    """sicherheit-2 on a11a41f: a moved tag would run with the rights to publish."""
+    text = (ROOT / ".github" / "workflows" / workflow).read_text(encoding="utf-8")
+    uses = re.findall(r"uses:\s*(\S+)", text)
+    assert uses
+    for ref in uses:
+        assert re.fullmatch(r"[\w.-]+/[\w.-]+@[0-9a-f]{40}", ref), ref
