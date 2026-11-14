@@ -143,8 +143,8 @@ _stdout = SafeConsole(soft_wrap=True)
     is_flag=True,
     help="Additionally use native package-manager CLIs (cargo, go, npm, cmake, gradle, ...) "
          "if installed. This runs the project's own build code (CMakeLists.txt, gradlew, "
-         "conanfile.py, Maven plugins): only on code you trust, never on a pull request "
-         "from a fork.",
+         "conanfile.py, Maven plugins), and these tools may download from the network: "
+         "only on code you trust, never on a pull request from a fork.",
 )
 @click.option(
     "--no-declared-metadata",
@@ -469,6 +469,12 @@ def _run(  # noqa: PLR0913 — mirrors the CLI surface
     # Conditional alternatives travel MARKED, not as components.
     real = [c for c in components if not c.condition]
     conditional = [c for c in components if c.condition]
+
+    for note in stats.go_notes:
+        # go list runs offline (G-NET): what it could not resolve without the
+        # network is said, and the bill names go.sum's versions as unresolved.
+        console.print(f"[yellow]Go:[/yellow] {fg(note)}; the bill lists go.sum instead, "
+                      "versions unresolved.", soft_wrap=True)
 
     for warning in stats.build_warnings:
         # What a build directory could not prove is said, never only logged

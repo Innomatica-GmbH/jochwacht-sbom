@@ -522,6 +522,7 @@ def collect_components(
         ))
 
     go_versions_unresolved = False
+    go_notes: list[str] = []   # why go list gave no linked set (offline, G-NET)
     # Files the lockfile/manifest path read (west.yml, uv.lock, …): they
     # count as build files too — a read west.yml is a build system found,
     # even when no component of it survives the filters.
@@ -537,6 +538,9 @@ def collect_components(
         # the note into the payload so the server records it (CRA).
         if getattr(dep, "versions_unresolved", False):
             go_versions_unresolved = True
+            why = getattr(dep, "versions_unresolved_why", "")
+            if why and why not in go_notes:
+                go_notes.append(why)
         if not dep.declared and _not_component(dep.name, dep.ecosystem):
             continue  # ${ARGN} or the project depending on itself
         # A find_package behind an off-by-default option is an ALTERNATIVE —
@@ -809,6 +813,7 @@ def collect_components(
         conditional=len(conditional_comps),
         lifecycle=lifecycle,
         go_versions_unresolved=go_versions_unresolved,
+        go_notes=[strip_control_chars(n) for n in go_notes],
         oversized_files=file_limit.skipped_names(),
         # One build that names its product: that is the product (as the suite
         # writes it); of several builds, none is "the" product.

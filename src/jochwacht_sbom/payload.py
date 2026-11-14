@@ -135,6 +135,8 @@ class CheckStats(BaseModel):
     #: toolchain / no buildable package on the customer's machine. The server
     #: records the note so a go.sum-only bill is not read as the built set
     go_versions_unresolved: bool = False
+    #: Why go list gave no linked set (local output only, never uploaded).
+    go_notes: list[str] = Field(default_factory=list, exclude=True)
 
 
 class CheckPayload(BaseModel):

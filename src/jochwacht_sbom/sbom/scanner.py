@@ -114,6 +114,9 @@ class Dependency(BaseModel):
     #: The collector carries this into the payload so the server records the
     #: note.
     versions_unresolved: bool = False
+    #: Why go could not give the linked set, for the customer's output only
+    #: ("" = no toolchain or no go.mod, nothing to say). Never uploaded.
+    versions_unresolved_why: str = Field(default="", exclude=True)
     # Provenance class of the version: "" = resolved/pinned (lockfile or
     # exact pin), "manifest" = a constraint-derived minimum from a manifest
     # (pyproject `>=`, requirements `>=`, CMake find_package). Manifest
@@ -1389,21 +1392,60 @@ def scan_go_sum(path: Path) -> list[Dependency]:
 _GO_EXCLUDE_SEGMENTS = frozenset({"testdata", "examples", "example"})
 
 
+#: The environment of every ``go`` call, over the user's own (coordination
+#: and sicherheit-2 G-NET, 14.11.2026). With go's defaults ``go list``
+#: downloads missing modules from proxy.golang.org (the names and versions of
+#: the project's dependencies leave the machine), asks sum.golang.org, goes
+#: direct to a VCS host for GOPRIVATE patterns, and a ``go``/``toolchain``
+#: line in go.mod downloads and runs another Go. Offline: only the local
+#: module cache is read. ``-mod=readonly``: go.mod and go.sum in the scanned
+#: folder are never rewritten (``-mod=mod`` would write into it).
+GO_OFFLINE_ENV: dict[str, str] = {
+    "GOPROXY": "off",
+    "GOTOOLCHAIN": "local",
+    "GOSUMDB": "off",
+    "GOVCS": "*:off",
+    "GOFLAGS": "-mod=readonly",
+    "GONOPROXY": "",
+    "GONOSUMDB": "",
+    "GOPRIVATE": "",
+}
+
+#: Why the last ``go`` call failed, in the customer's words ("" = it did not
+#: fail). Read by :func:`scan_go` for the named warning of the fallback.
+_go_failure: list[str] = []
+
+
+def _go_failure_reason(stderr: str) -> str:
+    text = " ".join(stderr.split())
+    if "GOTOOLCHAIN=local" in text or "requires go >=" in text:
+        return ("go.mod asks for a newer Go toolchain than the installed one, and the "
+                "collector never lets go download one")
+    if "GOPROXY=off" in text or "module lookup disabled" in text:
+        return ("modules the project needs are missing from the local Go module cache, and "
+                "the collector never lets go download them; run `go mod download` yourself "
+                "to fill the cache, then scan again")
+    return f"go list failed ({text[:160]})" if text else "go list failed"
+
+
 def _run_go(args: list[str], cwd: Path, timeout: float = 180.0) -> tuple[bool, str]:
-    """Run ``go <args>`` in *cwd*, non-writing (``-mod=readonly``). (ok, stdout)."""
+    """Run ``go <args>`` in *cwd*, offline and non-writing (:data:`GO_OFFLINE_ENV`).
+    (ok, stdout)."""
     if shutil.which("go") is None:
         return False, ""
     try:
         proc = subprocess.run(  # noqa: S603,S607 — fixed args, no user text
             ["go", *args], cwd=str(cwd), capture_output=True, text=True,
-            timeout=timeout, env={**os.environ, "GOFLAGS": "-mod=readonly"},
+            timeout=timeout, env={**os.environ, **GO_OFFLINE_ENV},
         )
     except (subprocess.SubprocessError, OSError) as exc:
         logger.info("go %s unusable (%s)", args[0] if args else "", exc)
+        _go_failure[:] = [f"go could not be run ({type(exc).__name__})"]
         return False, ""
     if proc.returncode != 0:
         logger.info("go %s exit %s: %s", " ".join(args[:2]),
                     proc.returncode, proc.stderr[:200])
+        _go_failure[:] = [_go_failure_reason(proc.stderr)]
         return False, ""
     return True, proc.stdout
 
@@ -1531,13 +1573,16 @@ def scan_go(path: Path) -> list[Dependency]:
     fallback. On the fallback every component is marked ``versions_unresolved``
     so the uploaded payload carries the note and the server records it (CRA).
     """
+    _go_failure[:] = []
     resolved = resolve_go_linked(path.parent)
     if resolved is not None:
         logger.info("go list -deps: %d linked modules in %s", len(resolved), path.parent)
         return resolved
+    why = _go_failure[0] if _go_failure else ""
     deps = scan_go_sum(path)
     for dep in deps:
         dep.versions_unresolved = True
+        dep.versions_unresolved_why = why
     logger.info("go.sum fallback: %d modules in %s (versions unresolved)",
                 len(deps), path)
     return deps

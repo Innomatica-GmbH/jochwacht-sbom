@@ -105,9 +105,14 @@ CLIs for higher-fidelity results.
 
 **`--with-tools` runs the project's own build code.** cmake executes the
 `CMakeLists.txt`, Gradle the project's `gradlew` and build scripts, Maven its
-plugins, Conan the `conanfile.py`, and these tools write into the project as
-they do in a build. Use it only on code you trust — never on a pull request
-from a fork in CI. Without the flag no build code of the project is run.
+plugins, Conan the `conanfile.py`, and these tools write into the project and
+download from the network as they do in a build. Use it only on code you
+trust — never on a pull request from a fork in CI. Without the flag no build
+code of the project is run, and the tools the default run calls do not use
+the network: `pkg-config`, `dpkg` and `rpm` for the versions of system
+libraries, and `go list`, which runs offline — it reads only your local Go
+module cache and never downloads a module or a toolchain (when something is
+missing there, the run says so and lists go.sum).
 
 **Nothing leaves your machine.** The default run transmits nothing.
 
