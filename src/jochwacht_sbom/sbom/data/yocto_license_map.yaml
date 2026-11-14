@@ -1,0 +1,476 @@
+# Yocto licence names that are no SPDX identifier, with the value we write
+# and the evidence for it (TR-03183-2 §6.1; coordination, 14.11.2026).
+#
+# The order of §6.1, applied by licenses.yocto_license_expression
+# (coordination after sicherheit-2's review, 14.11.2026):
+#   - A current SPDX identifier stays as it is (Yocto & -> AND, | -> OR).
+#   - Every other name, a deprecated SPDX identifier and create-spdx's
+#     LicenseRef-<name> included, needs an entry here, or it is free text (red):
+#   1. tier "spdx": a current SPDX identifier or expression (WITH included),
+#      proven by the build's text against the SPDX template (SPDX License List
+#      Matching Guidelines); no deprecated identifier in the value;
+#   2. tier "scancode": LicenseRef-scancode-<key>, in scancode_license_refs.yaml;
+#   3. tier "openembedded": LicenseRef-openembedded-<name>, only for a name of
+#      openembedded_common_licenses.yaml (poky meta/files/common-licenses) and
+#      only after ScanCode was checked without a matching key.
+#   A customer's own licence is never attributed to OpenEmbedded.
+#
+# Every entry names what it was measured on. A new entry needs the same:
+# the build's licence text (deploy/licenses/<recipe>/generic_<name>, which
+# is common-licenses/<name>), its sha256, and the comparison.
+spdx_license_list_version: "3.28.0"
+scancode_licensedb_commit: "f10c818a2fbf0cd57a7c1b6cadd86a863408183c"
+entries:
+  "bzip2-1.0.4":
+    tier: scancode
+    value: "LicenseRef-scancode-bzip2-libbzip-1.0.4"
+    evidence: >-
+      Build text deploy/licenses/busybox/generic_bzip2-1.0.4 (Yocto kirkstone,
+      sha256 9491498bec823e515e401edad444db14c48fee32d64a5c5be9c1e3f3357921d6)
+      is equal, after case, whitespace, quote and separator-line
+      normalisation, to the ScanCode text of key bzip2-libbzip-1.0.4
+      (1724 characters each). It does not match the SPDX 3.28.0 template of
+      bzip2-1.0.6: the attribution line reads "Julian Seward, Cambridge, UK."
+      where the template has no variable. bzip2-1.0.5 is deprecated in 3.28.0.
+      Control: the build's generic_bzip2-1.0.6 matches the bzip2-1.0.6 template.
+  "PD":
+    tier: scancode
+    value: "LicenseRef-scancode-public-domain"
+    evidence: >-
+      common-licenses/PD holds no licence text, only "This is a placeholder for
+      the Public Domain License" (deploy/licenses/pixman/generic_PD, 52 bytes),
+      so no SPDX template can match; SPDX lists no public-domain identifier.
+      ScanCode key public-domain is the statement the name makes.
+  "CLOSED":
+    tier: scancode
+    value: "LicenseRef-scancode-proprietary-license"
+    evidence: >-
+      LICENSE = "CLOSED" marks closed-source code in OpenEmbedded; such a
+      recipe needs no LIC_FILES_CHKSUM (Yocto reference manual, LICENSE /
+      LIC_FILES_CHKSUM), so there is no licence text to compare. ScanCode key
+      proprietary-license; decision of the coordination, 14.11.2026.
+
+  # --- suite-c, 14.11.2026: every other name of poky's common-licenses off
+  # the current SPDX list, and poky's SPDXLICENSEMAP keys (see
+  # openembedded_common_licenses.yaml). Measured, never by name alone.
+
+  "Apache-2.0-with-LLVM-exception":
+    tier: spdx
+    value: "Apache-2.0 WITH LLVM-exception"
+    evidence: "Text poky meta/files/common-licenses (kirkstone 445a6223 = scarthgap b6ae714, same bytes)/Apache-2.0-with-LLVM-exception, sha256 f72b120d1385408e9e380acc020756eb6ba1b461d66c328ea67327ba08d7dcfd, matches the SPDX 3.28.0 templates Apache-2.0 (template sha256 5567209d3a634ebd6ed122a7302563b9668ab141941149a4e30d9c7b887f41b9) + LLVM-exception (template sha256 6c1e641f62c534da83b25e550348c522032098e1e92f7cb8c2d13be1ca8b58cc) from license-list-data v3.28.0 (release tarball sha256 52375a91b28b5f6f3142c4b3a555086482f1e09be68c4fa7fdbf377d37afa340) as a whole, by the SPDX License List Matching Guidelines, applied strictly (case, whitespace, quote and dash variants, separator lines, comment marks, http/https, var, optional; no equivalent words, no bullet or copyright-symbol widening); the vars take only the section numbers and the appendix placeholder (0.6% of the normalised text)."
+  "bzip2-1.0.5":
+    tier: spdx
+    value: "bzip2-1.0.6"
+    evidence: "Text poky meta/files/common-licenses (kirkstone 445a6223 = scarthgap b6ae714, same bytes)/bzip2-1.0.5, sha256 96b2cb9b836969603a820faf06f8e28b0b46809692b791793df291b658540db7, matches the SPDX 3.28.0 template bzip2-1.0.6 (template sha256 fc78a445245bfa162085ad6c9cebee06166f3d505245de06be6be9d5832c6018) from license-list-data v3.28.0 (release tarball sha256 52375a91b28b5f6f3142c4b3a555086482f1e09be68c4fa7fdbf377d37afa340) as a whole, by the SPDX License List Matching Guidelines, applied strictly (case, whitespace, quote and dash variants, separator lines, comment marks, http/https, var, optional; no equivalent words, no bullet or copyright-symbol widening); the vars take the version line and the copyright line (SPDX deprecated bzip2-1.0.5 in 3.16 as equivalent to bzip2-1.0.6) (11.1% of the normalised text)."
+  "EDL-1.0":
+    tier: spdx
+    value: "BSD-3-Clause"
+    evidence: "Text poky meta/files/common-licenses (kirkstone 445a6223 = scarthgap b6ae714, same bytes)/EDL-1.0, sha256 34b4674e457e0b0ecdec224e6a47b68eedcd489678fbff0719ee74fa00a84691, matches the SPDX 3.28.0 template BSD-3-Clause (template sha256 c42368b683ceef1ad41b6f17999adf3b7534e3c47fbdd51449ed6690edb1fc5f) from license-list-data v3.28.0 (release tarball sha256 52375a91b28b5f6f3142c4b3a555086482f1e09be68c4fa7fdbf377d37afa340) as a whole, by the SPDX License List Matching Guidelines, applied strictly (case, whitespace, quote and dash variants, separator lines, comment marks, http/https, var, optional; no equivalent words, no bullet or copyright-symbol widening); the vars take the title line with the Eclipse copyright and the organisation's name in clause 3 (BSD-3-Clause; SPDX notes EDL-1.0 as BSD-3-Clause) (28.5% of the normalised text)."
+  "FSF-Unlimited":
+    tier: spdx
+    value: "FSFULLR"
+    evidence: "Text poky meta/files/common-licenses (kirkstone 445a6223 = scarthgap b6ae714, same bytes)/FSF-Unlimited, sha256 dc2d55ddec826cd1339ad1bc4e14fc3e28407373f56b7404dda22ee6d02d0edf, matches the SPDX 3.28.0 template FSFULLR (template sha256 8e6eeaf5774e0882367f0359efbad4468fd08d6921412054ece500acb1daf327) from license-list-data v3.28.0 (release tarball sha256 52375a91b28b5f6f3142c4b3a555086482f1e09be68c4fa7fdbf377d37afa340) as a whole, by the SPDX License List Matching Guidelines, applied strictly (case, whitespace, quote and dash variants, separator lines, comment marks, http/https, var, optional; no equivalent words, no bullet or copyright-symbol widening); the var takes only the copyright line (22.9% of the normalised text)."
+  "SGI-1":
+    tier: spdx
+    value: "SGI-OpenGL"
+    evidence: "Text poky meta/files/common-licenses (kirkstone 445a6223 = scarthgap b6ae714, same bytes)/SGI-1, sha256 53c7271927c252a573d3fec755c382cc316978a62650c692fbd27d9b4b8b3ad5, matches the SPDX 3.28.0 template SGI-OpenGL (template sha256 f7e98cac5b7cfb41bd86ce4f14eee8ca25363d33cad89cd55b14f6da8e73b877) from license-list-data v3.28.0 (release tarball sha256 52375a91b28b5f6f3142c4b3a555086482f1e09be68c4fa7fdbf377d37afa340) as a whole, by the SPDX License List Matching Guidelines, applied strictly (case, whitespace, quote and dash variants, separator lines, comment marks, http/https, var, optional; no equivalent words, no bullet or copyright-symbol widening); the var takes only the copyright line (3.4% of the normalised text)."
+  "Simple-2.0":
+    tier: spdx
+    value: "SimPL-2.0"
+    evidence: "Text poky meta/files/common-licenses (kirkstone 445a6223 = scarthgap b6ae714, same bytes)/Simple-2.0, sha256 b20fac74e5409e361ca9de0e9c419d7e9bf9ec18de3b784eee05d1c7de50e063, matches the SPDX 3.28.0 template SimPL-2.0 (template sha256 8d259a47ef5004a9ec772f3b3d88ca606a0174a8af5d8233b2142bba98cdb719) from license-list-data v3.28.0 (release tarball sha256 52375a91b28b5f6f3142c4b3a555086482f1e09be68c4fa7fdbf377d37afa340) as a whole, by the SPDX License List Matching Guidelines, applied strictly (case, whitespace, quote and dash variants, separator lines, comment marks, http/https, var, optional; no equivalent words, no bullet or copyright-symbol widening); the template has no var (0.0% of the normalised text)."
+  "UCB":
+    tier: spdx
+    value: "BSD-3-Clause"
+    evidence: "Text poky meta/files/common-licenses (kirkstone 445a6223 = scarthgap b6ae714, same bytes)/UCB, sha256 0a4254e5bce8b53fc154ad0c152376ffc24978580d6e6e999d5904668a2cf1aa, matches the SPDX 3.28.0 template BSD-3-Clause (template sha256 c42368b683ceef1ad41b6f17999adf3b7534e3c47fbdd51449ed6690edb1fc5f) from license-list-data v3.28.0 (release tarball sha256 52375a91b28b5f6f3142c4b3a555086482f1e09be68c4fa7fdbf377d37afa340) as a whole, by the SPDX License List Matching Guidelines, applied strictly (case, whitespace, quote and dash variants, separator lines, comment marks, http/https, var, optional; no equivalent words, no bullet or copyright-symbol widening); the vars take the Regents' copyright line and their name in clauses 3 and the disclaimer (26.3% of the normalised text)."
+  "unfs3":
+    tier: spdx
+    value: "BSD-3-Clause"
+    evidence: "Text poky meta/files/common-licenses (kirkstone 445a6223 = scarthgap b6ae714, same bytes)/unfs3, sha256 89049bddacd81f115baf437d6b3ed9810d48ec028121d8eda53f7a1b89e9df88, matches the SPDX 3.28.0 template BSD-3-Clause (template sha256 c42368b683ceef1ad41b6f17999adf3b7534e3c47fbdd51449ed6690edb1fc5f) from license-list-data v3.28.0 (release tarball sha256 52375a91b28b5f6f3142c4b3a555086482f1e09be68c4fa7fdbf377d37afa340) as a whole, by the SPDX License List Matching Guidelines, applied strictly (case, whitespace, quote and dash variants, separator lines, comment marks, http/https, var, optional; no equivalent words, no bullet or copyright-symbol widening); the vars take the UNFS3 copyright line and 'the author' in clause 3 and the disclaimer (17.1% of the normalised text)."
+  "XFree86-1.0":
+    tier: spdx
+    value: "X11"
+    evidence: "Text poky meta/files/common-licenses (kirkstone 445a6223 = scarthgap b6ae714, same bytes)/XFree86-1.0, sha256 07f48b0e9bd2d07fc6b08e87a53d6ae7a27546984c961213e9902a2d4e5a1ffb, matches the SPDX 3.28.0 template X11 (template sha256 30fe15e95c81333bce7ccb6e6a27c9a4bbf67d80d2990d0f7c7268671f75da5e) from license-list-data v3.28.0 (release tarball sha256 52375a91b28b5f6f3142c4b3a555086482f1e09be68c4fa7fdbf377d37afa340) as a whole, by the SPDX License List Matching Guidelines, applied strictly (case, whitespace, quote and dash variants, separator lines, comment marks, http/https, var, optional; no equivalent words, no bullet or copyright-symbol widening); the vars take the copyright line and 'The XFree86 Project' where the template names X Consortium (9.7% of the normalised text)."
+  "XSL":
+    tier: spdx
+    value: "DocBook-XML"
+    evidence: "Text poky meta/files/common-licenses (kirkstone 445a6223 = scarthgap b6ae714, same bytes)/XSL, sha256 fbcc8cbe595f2701cb0f25cd6063eeab513214c729fad41a3253b70d2fbf211e, matches the SPDX 3.28.0 template DocBook-XML (template sha256 6b4696335c36d2d2d9faaf5419d029be1e7cc6ac1283f37bec6ca32f9b40cea8) from license-list-data v3.28.0 (release tarball sha256 52375a91b28b5f6f3142c4b3a555086482f1e09be68c4fa7fdbf377d37afa340) as a whole, by the SPDX License List Matching Guidelines, applied strictly (case, whitespace, quote and dash variants, separator lines, comment marks, http/https, var, optional; no equivalent words, no bullet or copyright-symbol widening); the var takes exactly the copyright lines the template names as original (10.0% of the normalised text)."
+  "Adobe":
+    tier: scancode
+    value: "LicenseRef-scancode-adobe-postscript"
+    evidence: "Text poky meta/files/common-licenses (kirkstone 445a6223 = scarthgap b6ae714, same bytes)/Adobe equals, after case, whitespace and quote normalisation, the ScanCode text of key adobe-postscript (ScanCode LicenseDB f10c818 (docs/index.json, sha256 9b0bdc5c...d40b); docs/adobe-postscript.LICENSE at f10c818, sha256 d3cd1c8b6b9ba63c17c2eea875b017e313d717b3c73848c8845f9d4855bf764b, front matter removed) except the leading copyright line, which the guidelines let go. No SPDX template matches: Adobe-2006, Adobe-Display-PostScript, Adobe-Glyph, Adobe-Utopia and the other Adobe-* templates diverge."
+  "BitstreamVera":
+    tier: openembedded
+    value: "LicenseRef-openembedded-BitstreamVera"
+    evidence: "No SPDX value proven from poky meta/files/common-licenses (kirkstone 445a6223 = scarthgap b6ae714, same bytes)/BitstreamVera: the file holds the font README and its copyright FAQ besides the licence; the Bitstream-Vera template does not match the whole text; ScanCode key bitstream resolves to the SPDX id Bitstream-Vera, no LicenseRef-scancode key. ScanCode checked (ScanCode LicenseDB f10c818 (docs/index.json, sha256 9b0bdc5c...d40b), by key name and, where named, by text): no key with matching text."
+  "DSSSL":
+    tier: openembedded
+    value: "LicenseRef-openembedded-DSSSL"
+    evidence: "No SPDX value proven from poky meta/files/common-licenses (kirkstone 445a6223 = scarthgap b6ae714, same bytes)/DSSSL: A higher tier is open for decision (suite-c, 14.11.2026): the DocBook-XML template matches only because its copyright var (.{0,5000}) also takes an attribution paragraph and the sentence 'this software may be distributed under the same terms as Jade', which is no copyright notice; not taken. ScanCode: no dsssl or jade key. ScanCode checked (ScanCode LicenseDB f10c818 (docs/index.json, sha256 9b0bdc5c...d40b), by key name and, where named, by text): no key with matching text."
+  "eCos-2.0":
+    tier: spdx
+    value: "GPL-2.0-or-later WITH eCos-exception-2.0"
+    evidence: "Decision of the coordination, 14.11.2026: the text of poky meta/files/common-licenses (kirkstone 445a6223 = scarthgap b6ae714, same bytes)/eCos-2.0 matches the SPDX 3.28.0 template of the deprecated id eCos-2.0; SPDX names the replacement ('DEPRECATED: Use license expression including main license, \"WITH\" operator, and identifier: eCos-exception-2.0'), and the text states the main licence itself: GNU General Public License 'either version 2 or (at your option) any later version'."
+  "GFDL-1.1":
+    tier: openembedded
+    value: "LicenseRef-openembedded-GFDL-1.1"
+    evidence: "No SPDX value proven from poky meta/files/common-licenses (kirkstone 445a6223 = scarthgap b6ae714, same bytes)/GFDL-1.1: the text matches GFDL-1.1-only and GFDL-1.1-or-later alike; the scope is not in the licence text, and SPDX deprecated the bare id; ScanCode gfdl keys resolve to SPDX ids, no LicenseRef-scancode key. ScanCode checked (ScanCode LicenseDB f10c818 (docs/index.json, sha256 9b0bdc5c...d40b), by key name and, where named, by text): no key with matching text."
+  "GFDL-1.2":
+    tier: openembedded
+    value: "LicenseRef-openembedded-GFDL-1.2"
+    evidence: "No SPDX value proven from poky meta/files/common-licenses (kirkstone 445a6223 = scarthgap b6ae714, same bytes)/GFDL-1.2: the text matches GFDL-1.2-only and GFDL-1.2-or-later alike; the scope is not in the licence text, and SPDX deprecated the bare id; ScanCode gfdl keys resolve to SPDX ids, no LicenseRef-scancode key. ScanCode checked (ScanCode LicenseDB f10c818 (docs/index.json, sha256 9b0bdc5c...d40b), by key name and, where named, by text): no key with matching text."
+  "GFDL-1.3":
+    tier: openembedded
+    value: "LicenseRef-openembedded-GFDL-1.3"
+    evidence: "No SPDX value proven from poky meta/files/common-licenses (kirkstone 445a6223 = scarthgap b6ae714, same bytes)/GFDL-1.3: the text matches GFDL-1.3-only and GFDL-1.3-or-later alike; the scope is not in the licence text, and SPDX deprecated the bare id; ScanCode gfdl keys resolve to SPDX ids, no LicenseRef-scancode key. ScanCode checked (ScanCode LicenseDB f10c818 (docs/index.json, sha256 9b0bdc5c...d40b), by key name and, where named, by text): no key with matching text."
+  "GPL-2-with-bison-exception":
+    tier: openembedded
+    value: "LicenseRef-openembedded-GPL-2-with-bison-exception"
+    evidence: "No SPDX value proven from poky meta/files/common-licenses (kirkstone 445a6223 = scarthgap b6ae714, same bytes)/GPL-2-with-bison-exception: the file is the placeholder 'insert GPL v2 text here' and the Bison exception; whether GPL-2.0-only or -or-later is not stated; ScanCode bison-exception-2.0 is an exception only (SPDX Bison-exception-1.24). ScanCode checked (ScanCode LicenseDB f10c818 (docs/index.json, sha256 9b0bdc5c...d40b), by key name and, where named, by text): no key with matching text."
+  "GPL-2.0-with-autoconf-exception":
+    tier: openembedded
+    value: "LicenseRef-openembedded-GPL-2.0-with-autoconf-exception"
+    evidence: "No SPDX value proven from poky meta/files/common-licenses (kirkstone 445a6223 = scarthgap b6ae714, same bytes)/GPL-2.0-with-autoconf-exception: the file is the placeholder 'insert GPL v2 licence text here' and the exception; SPDX deprecated the id ('main license WITH Autoconf-exception-2.0'), the scope is not stated; ScanCode: exception keys only. ScanCode checked (ScanCode LicenseDB f10c818 (docs/index.json, sha256 9b0bdc5c...d40b), by key name and, where named, by text): no key with matching text."
+  "GPL-2.0-with-classpath-exception":
+    tier: openembedded
+    value: "LicenseRef-openembedded-GPL-2.0-with-classpath-exception"
+    evidence: "No SPDX value proven from poky meta/files/common-licenses (kirkstone 445a6223 = scarthgap b6ae714, same bytes)/GPL-2.0-with-classpath-exception: the file is the placeholder 'insert GPL v2 licence text here' and the exception; SPDX deprecated the id ('main license WITH Classpath-exception-2.0'), the scope is not stated; ScanCode: exception keys only. ScanCode checked (ScanCode LicenseDB f10c818 (docs/index.json, sha256 9b0bdc5c...d40b), by key name and, where named, by text): no key with matching text."
+  "GPL-2.0-with-font-exception":
+    tier: openembedded
+    value: "LicenseRef-openembedded-GPL-2.0-with-font-exception"
+    evidence: "No SPDX value proven from poky meta/files/common-licenses (kirkstone 445a6223 = scarthgap b6ae714, same bytes)/GPL-2.0-with-font-exception: the file is the placeholder 'insert GPL v2 text here' and the exception; SPDX deprecated the id ('main license WITH Font-exception-2.0'), the scope is not stated; ScanCode: exception keys only. ScanCode checked (ScanCode LicenseDB f10c818 (docs/index.json, sha256 9b0bdc5c...d40b), by key name and, where named, by text): no key with matching text."
+  "GPL-2.0-with-GCC-exception":
+    tier: openembedded
+    value: "LicenseRef-openembedded-GPL-2.0-with-GCC-exception"
+    evidence: "No SPDX value proven from poky meta/files/common-licenses (kirkstone 445a6223 = scarthgap b6ae714, same bytes)/GPL-2.0-with-GCC-exception: the file is the placeholder 'insert GPL v2 text here' and the exception; SPDX deprecated the id ('main license WITH GCC-exception-2.0'), the main licence's scope is not stated; ScanCode: exception keys only. ScanCode checked (ScanCode LicenseDB f10c818 (docs/index.json, sha256 9b0bdc5c...d40b), by key name and, where named, by text): no key with matching text."
+  "GPL-2.0-with-OpenSSL-exception":
+    tier: openembedded
+    value: "LicenseRef-openembedded-GPL-2.0-with-OpenSSL-exception"
+    evidence: "No SPDX value proven from poky meta/files/common-licenses (kirkstone 445a6223 = scarthgap b6ae714, same bytes)/GPL-2.0-with-OpenSSL-exception: GPL-2.0 text plus the OpenSSL exception; whether GPL-2.0-only or -or-later is not stated (the 'any later version' words are the GPL's own how-to appendix); ScanCode openssl-exception-gpl-2.0 and -plus are exceptions only, which a WITH cannot take as LicenseRef. ScanCode checked (ScanCode LicenseDB f10c818 (docs/index.json, sha256 9b0bdc5c...d40b), by key name and, where named, by text): no key with matching text."
+  "GPL-3-with-bison-exception":
+    tier: openembedded
+    value: "LicenseRef-openembedded-GPL-3-with-bison-exception"
+    evidence: "No SPDX value proven from poky meta/files/common-licenses (kirkstone 445a6223 = scarthgap b6ae714, same bytes)/GPL-3-with-bison-exception: the file is the placeholder 'insert GPL v3 text here' and the Bison exception; whether GPL-3.0-only or -or-later is not stated; ScanCode bison exceptions are exceptions only. ScanCode checked (ScanCode LicenseDB f10c818 (docs/index.json, sha256 9b0bdc5c...d40b), by key name and, where named, by text): no key with matching text."
+  "GPL-3.0-with-autoconf-exception":
+    tier: openembedded
+    value: "LicenseRef-openembedded-GPL-3.0-with-autoconf-exception"
+    evidence: "No SPDX value proven from poky meta/files/common-licenses (kirkstone 445a6223 = scarthgap b6ae714, same bytes)/GPL-3.0-with-autoconf-exception: the file holds only the Autoconf exception 3.0 (the Autoconf-exception-3.0 template matches it); the GPL-3.0 scope is not stated; ScanCode: exception keys only. ScanCode checked (ScanCode LicenseDB f10c818 (docs/index.json, sha256 9b0bdc5c...d40b), by key name and, where named, by text): no key with matching text."
+  "GPL-3.0-with-GCC-exception":
+    tier: openembedded
+    value: "LicenseRef-openembedded-GPL-3.0-with-GCC-exception"
+    evidence: "No SPDX value proven from poky meta/files/common-licenses (kirkstone 445a6223 = scarthgap b6ae714, same bytes)/GPL-3.0-with-GCC-exception: the text matches the deprecated SPDX template of this id (GPL-3.0 text and GCC-exception-3.1); SPDX says 'main license WITH GCC-exception-3.1', the scope -only/-or-later is not stated; ScanCode: exception keys only. ScanCode checked (ScanCode LicenseDB f10c818 (docs/index.json, sha256 9b0bdc5c...d40b), by key name and, where named, by text): no key with matching text."
+  "gSOAP-1":
+    tier: openembedded
+    value: "LicenseRef-openembedded-gSOAP-1"
+    evidence: "No SPDX value proven from poky meta/files/common-licenses (kirkstone 445a6223 = scarthgap b6ae714, same bytes)/gSOAP-1: the text is gSOAP 1.3b, but differs from the gSOAP-1.3b template in one word ('your' for 'you') besides line-break whitespace; ScanCode gsoap-1.3b resolves to the SPDX id. ScanCode checked (ScanCode LicenseDB f10c818 (docs/index.json, sha256 9b0bdc5c...d40b), by key name and, where named, by text): no key with matching text."
+  "LGPL-3.0-with-zeromq-exception":
+    tier: openembedded
+    value: "LicenseRef-openembedded-LGPL-3.0-with-zeromq-exception"
+    evidence: "No SPDX value proven from poky meta/files/common-licenses (kirkstone 445a6223 = scarthgap b6ae714, same bytes)/LGPL-3.0-with-zeromq-exception: LGPL-3.0 text plus the ZeroMQ exception; whether -only or -or-later is not stated; ScanCode zeromq-exception-lgpl-3.0 is an exception only. ScanCode checked (ScanCode LicenseDB f10c818 (docs/index.json, sha256 9b0bdc5c...d40b), by key name and, where named, by text): no key with matching text."
+  "Net-SNMP":
+    tier: openembedded
+    value: "LicenseRef-openembedded-Net-SNMP"
+    evidence: "No SPDX value proven from poky meta/files/common-licenses (kirkstone 445a6223 = scarthgap b6ae714, same bytes)/Net-SNMP: the text matches only the deprecated SPDX template Net-SNMP (deprecated in 3.25 as a licence stack); the ScanCode text of key net-snmp (sha256 fb6fe223...5c40 at f10c818) differs (poky adds part 8, Apple; ratio 0.84). ScanCode checked (ScanCode LicenseDB f10c818 (docs/index.json, sha256 9b0bdc5c...d40b), by key name and, where named, by text): no key with matching text."
+  "OASIS":
+    tier: openembedded
+    value: "LicenseRef-openembedded-OASIS"
+    evidence: "No SPDX value proven from poky meta/files/common-licenses (kirkstone 445a6223 = scarthgap b6ae714, same bytes)/OASIS: the DocBook-DTD template differs (it names the DocBook XML DTD and a paragraph this text lacks); ScanCode docbook keys resolve to SPDX ids. ScanCode checked (ScanCode LicenseDB f10c818 (docs/index.json, sha256 9b0bdc5c...d40b), by key name and, where named, by text): no key with matching text."
+  "ParaTypeFFL-1.3":
+    tier: spdx
+    value: "ParaType-Free-Font-1.3"
+    evidence: "Decision of the coordination, 14.11.2026: the text of poky meta/files/common-licenses (kirkstone 445a6223 = scarthgap b6ae714, same bytes)/ParaTypeFFL-1.3 equals the SPDX 3.28.0 template ParaType-Free-Font-1.3 word for word except one character, where the template has a Cyrillic 'а' (U+0430) and the text a Latin 'a' ('а combination of original name'); a character error in the SPDX template, not a difference in content. With that one character the strict matching guidelines give a match."
+  "Proprietary":
+    tier: scancode
+    value: "LicenseRef-scancode-proprietary-license"
+    evidence: "Decision of the coordination, 14.11.2026: poky meta/files/common-licenses (kirkstone 445a6223 = scarthgap b6ae714, same bytes)/Proprietary holds no licence text, only 'Proprietary license.' (21 bytes), so no text can match; like CLOSED it is written as the ScanCode reference of key proprietary-license (ScanCode LicenseDB f10c818)."
+  "RHeCos-1":
+    tier: spdx
+    value: "RHeCos-1.1"
+    evidence: "Decision of the coordination, 14.11.2026: the text of poky meta/files/common-licenses (kirkstone 445a6223 = scarthgap b6ae714, same bytes)/RHeCos-1 (it names itself Red Hat eCos Public License v1.1) equals the SPDX 3.28.0 template RHeCos-1.1 except whitespace inside three tokens where a line breaks after a hyphen or slash ('de- archiving', 'non- exclusive', 'http:// www'); whitespace and line breaks do not count under the SPDX matching guidelines."
+  "SMAIL_GPL":
+    tier: openembedded
+    value: "LicenseRef-openembedded-SMAIL-GPL"
+    evidence: "No SPDX value proven from poky meta/files/common-licenses (kirkstone 445a6223 = scarthgap b6ae714, same bytes)/SMAIL_GPL: A higher tier is open for decision (suite-c, 14.11.2026): the file is the Debian debianutils copyright text followed by the SMAIL-GPL licence; the SMAIL-GPL template does not match the whole file. ScanCode smail-gpl resolves to the SPDX id. ScanCode checked (ScanCode LicenseDB f10c818 (docs/index.json, sha256 9b0bdc5c...d40b), by key name and, where named, by text): no key with matching text."
+  "SugarCRM-1":
+    tier: openembedded
+    value: "LicenseRef-openembedded-SugarCRM-1"
+    evidence: "No SPDX value proven from poky meta/files/common-licenses (kirkstone 445a6223 = scarthgap b6ae714, same bytes)/SugarCRM-1: the SugarCRM-1.1.3 template differs in numbering and sections; ScanCode sugarcrm-1.1.3 resolves to the SPDX id. ScanCode checked (ScanCode LicenseDB f10c818 (docs/index.json, sha256 9b0bdc5c...d40b), by key name and, where named, by text): no key with matching text."
+  "WXwindows":
+    tier: spdx
+    value: "LGPL-2.0-or-later WITH WxWindows-exception-3.1"
+    evidence: "Decision of the coordination, 14.11.2026: poky meta/files/common-licenses (kirkstone 445a6223 = scarthgap b6ae714, same bytes)/WXwindows is the wxWindows Library Licence 3.1 (SPDX: deprecated id wxWindows, 'Use license expression including main license, \"WITH\" operator, and identifier: WxWindows-exception-3.1'); the text states the main licence itself: GNU Library General Public Licence 'either version 2 of the Licence, or (at your option) any later version', and carries the wxWindows exception. No SPDX template matches the file as a whole (the deprecated template lacks its preamble)."
+  "AFL-1":
+    tier: spdx
+    value: "AFL-1.2"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[AFL-1] = \"AFL-1.2\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): AFL-1 is no SPDX 3.28.0 identifier, AFL-1.2 is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/AFL-1.2 (sha256 b120e371612eb2feca0d3faef93bc08c7fdd1fdce03b49c4b00cfe88302ec39a), against the SPDX 3.28.0 template AFL-1.2 with the strict matcher (suite-c calibration, 14.11.2026): NO MATCH by the strict reading (poky's file adds an explanatory section after 'END OF LICENSE'; a form difference the guidelines' title, copyright-symbol or end-text rules bridge, which the strict matcher leaves out)."
+  "AFL-2":
+    tier: spdx
+    value: "AFL-2.0"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[AFL-2] = \"AFL-2.0\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): AFL-2 is no SPDX 3.28.0 identifier, AFL-2.0 is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/AFL-2.0 (sha256 d2f0ad9acdc7c216b49ec9ca7c23d7a10fa80dc681f57b24ed5d378c61a18219), against the SPDX 3.28.0 template AFL-2.0 with the strict matcher (suite-c calibration, 14.11.2026): MATCH."
+  "AFLv1":
+    tier: spdx
+    value: "AFL-1.2"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[AFLv1] = \"AFL-1.2\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): AFLv1 is no SPDX 3.28.0 identifier, AFL-1.2 is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/AFL-1.2 (sha256 b120e371612eb2feca0d3faef93bc08c7fdd1fdce03b49c4b00cfe88302ec39a), against the SPDX 3.28.0 template AFL-1.2 with the strict matcher (suite-c calibration, 14.11.2026): NO MATCH by the strict reading (poky's file adds an explanatory section after 'END OF LICENSE'; a form difference the guidelines' title, copyright-symbol or end-text rules bridge, which the strict matcher leaves out)."
+  "AFLv2":
+    tier: spdx
+    value: "AFL-2.0"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[AFLv2] = \"AFL-2.0\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): AFLv2 is no SPDX 3.28.0 identifier, AFL-2.0 is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/AFL-2.0 (sha256 d2f0ad9acdc7c216b49ec9ca7c23d7a10fa80dc681f57b24ed5d378c61a18219), against the SPDX 3.28.0 template AFL-2.0 with the strict matcher (suite-c calibration, 14.11.2026): MATCH."
+  "AGPL-3":
+    tier: spdx
+    value: "AGPL-3.0-only"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[AGPL-3] = \"AGPL-3.0-only\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): AGPL-3 is no SPDX 3.28.0 identifier, AGPL-3.0-only is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/AGPL-3.0-only (sha256 57c8ff33c9c0cfc3ef00e650a1cc910d7ee479a8bc509f6c9209a7c2a11399d6), against the SPDX 3.28.0 template AGPL-3.0-only with the strict matcher (suite-c calibration, 14.11.2026): MATCH."
+  "AGPL-3+":
+    tier: spdx
+    value: "AGPL-3.0-or-later"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[AGPL-3+] = \"AGPL-3.0-or-later\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): AGPL-3+ is no SPDX 3.28.0 identifier, AGPL-3.0-or-later is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/AGPL-3.0-or-later (sha256 bb1f1ae69336415b990b197ee058aef4b92f31dc02c5ad2a4358ef1960f38bee), against the SPDX 3.28.0 template AGPL-3.0-or-later with the strict matcher (suite-c calibration, 14.11.2026): UNDECIDED (the regex ran beyond 30 s; never counted as a match)."
+  "AGPL-3.0":
+    tier: spdx
+    value: "AGPL-3.0-only"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[AGPL-3.0] = \"AGPL-3.0-only\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): AGPL-3.0 is deprecated in SPDX 3.28.0, AGPL-3.0-only is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/AGPL-3.0-only (sha256 57c8ff33c9c0cfc3ef00e650a1cc910d7ee479a8bc509f6c9209a7c2a11399d6), against the SPDX 3.28.0 template AGPL-3.0-only with the strict matcher (suite-c calibration, 14.11.2026): MATCH."
+  "AGPL-3.0+":
+    tier: spdx
+    value: "AGPL-3.0-or-later"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[AGPL-3.0+] = \"AGPL-3.0-or-later\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): AGPL-3.0+ is no SPDX 3.28.0 identifier, AGPL-3.0-or-later is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/AGPL-3.0-or-later (sha256 bb1f1ae69336415b990b197ee058aef4b92f31dc02c5ad2a4358ef1960f38bee), against the SPDX 3.28.0 template AGPL-3.0-or-later with the strict matcher (suite-c calibration, 14.11.2026): UNDECIDED (the regex ran beyond 30 s; never counted as a match)."
+  "AGPLv3":
+    tier: spdx
+    value: "AGPL-3.0-only"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[AGPLv3] = \"AGPL-3.0-only\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): AGPLv3 is no SPDX 3.28.0 identifier, AGPL-3.0-only is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/AGPL-3.0-only (sha256 57c8ff33c9c0cfc3ef00e650a1cc910d7ee479a8bc509f6c9209a7c2a11399d6), against the SPDX 3.28.0 template AGPL-3.0-only with the strict matcher (suite-c calibration, 14.11.2026): MATCH."
+  "AGPLv3+":
+    tier: spdx
+    value: "AGPL-3.0-or-later"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[AGPLv3+] = \"AGPL-3.0-or-later\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): AGPLv3+ is no SPDX 3.28.0 identifier, AGPL-3.0-or-later is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/AGPL-3.0-or-later (sha256 bb1f1ae69336415b990b197ee058aef4b92f31dc02c5ad2a4358ef1960f38bee), against the SPDX 3.28.0 template AGPL-3.0-or-later with the strict matcher (suite-c calibration, 14.11.2026): UNDECIDED (the regex ran beyond 30 s; never counted as a match)."
+  "AGPLv3.0":
+    tier: spdx
+    value: "AGPL-3.0-only"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[AGPLv3.0] = \"AGPL-3.0-only\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): AGPLv3.0 is no SPDX 3.28.0 identifier, AGPL-3.0-only is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/AGPL-3.0-only (sha256 57c8ff33c9c0cfc3ef00e650a1cc910d7ee479a8bc509f6c9209a7c2a11399d6), against the SPDX 3.28.0 template AGPL-3.0-only with the strict matcher (suite-c calibration, 14.11.2026): MATCH."
+  "AGPLv3.0+":
+    tier: spdx
+    value: "AGPL-3.0-or-later"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[AGPLv3.0+] = \"AGPL-3.0-or-later\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): AGPLv3.0+ is no SPDX 3.28.0 identifier, AGPL-3.0-or-later is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/AGPL-3.0-or-later (sha256 bb1f1ae69336415b990b197ee058aef4b92f31dc02c5ad2a4358ef1960f38bee), against the SPDX 3.28.0 template AGPL-3.0-or-later with the strict matcher (suite-c calibration, 14.11.2026): UNDECIDED (the regex ran beyond 30 s; never counted as a match)."
+  "Apache-2":
+    tier: spdx
+    value: "Apache-2.0"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[Apache-2] = \"Apache-2.0\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): Apache-2 is no SPDX 3.28.0 identifier, Apache-2.0 is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/Apache-2.0 (sha256 58f1fdcee3211f839f749c1ed97ca87fd56d9d01d729bb74241eca9e2ac710bc), against the SPDX 3.28.0 template Apache-2.0 with the strict matcher (suite-c calibration, 14.11.2026): MATCH."
+  "Apachev2":
+    tier: spdx
+    value: "Apache-2.0"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[Apachev2] = \"Apache-2.0\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): Apachev2 is no SPDX 3.28.0 identifier, Apache-2.0 is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/Apache-2.0 (sha256 58f1fdcee3211f839f749c1ed97ca87fd56d9d01d729bb74241eca9e2ac710bc), against the SPDX 3.28.0 template Apache-2.0 with the strict matcher (suite-c calibration, 14.11.2026): MATCH."
+  "Artistic-1":
+    tier: spdx
+    value: "Artistic-1.0"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[Artistic-1] = \"Artistic-1.0\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): Artistic-1 is no SPDX 3.28.0 identifier, Artistic-1.0 is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/Artistic-1.0 (sha256 793718c0b4e845fdfeb2018060268d9bbcfc30f74d07b494009b0b268b38e3fe), against the SPDX 3.28.0 template Artistic-1.0 with the strict matcher (suite-c calibration, 14.11.2026): MATCH."
+  "Artisticv1":
+    tier: spdx
+    value: "Artistic-1.0"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[Artisticv1] = \"Artistic-1.0\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): Artisticv1 is no SPDX 3.28.0 identifier, Artistic-1.0 is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/Artistic-1.0 (sha256 793718c0b4e845fdfeb2018060268d9bbcfc30f74d07b494009b0b268b38e3fe), against the SPDX 3.28.0 template Artistic-1.0 with the strict matcher (suite-c calibration, 14.11.2026): MATCH."
+  "BSD-0-Clause":
+    tier: spdx
+    value: "0BSD"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[BSD-0-Clause] = \"0BSD\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): BSD-0-Clause is no SPDX 3.28.0 identifier, 0BSD is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/0BSD (sha256 e3f18c71e10d673590eb9856c1d79dd3b4b0d65404efb5e8584dbede7edd608b), against the SPDX 3.28.0 template 0BSD with the strict matcher (suite-c calibration, 14.11.2026): MATCH."
+  "CDDL-1":
+    tier: spdx
+    value: "CDDL-1.0"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[CDDL-1] = \"CDDL-1.0\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): CDDL-1 is no SPDX 3.28.0 identifier, CDDL-1.0 is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/CDDL-1.0 (sha256 e7c245898de4f00c451b5637fd8e967970ace9f42910f906ffcbc4d89bcd4089), against the SPDX 3.28.0 template CDDL-1.0 with the strict matcher (suite-c calibration, 14.11.2026): MATCH."
+  "CDDLv1":
+    tier: spdx
+    value: "CDDL-1.0"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[CDDLv1] = \"CDDL-1.0\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): CDDLv1 is no SPDX 3.28.0 identifier, CDDL-1.0 is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/CDDL-1.0 (sha256 e7c245898de4f00c451b5637fd8e967970ace9f42910f906ffcbc4d89bcd4089), against the SPDX 3.28.0 template CDDL-1.0 with the strict matcher (suite-c calibration, 14.11.2026): MATCH."
+  "EPLv1.0":
+    tier: spdx
+    value: "EPL-1.0"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[EPLv1.0] = \"EPL-1.0\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): EPLv1.0 is no SPDX 3.28.0 identifier, EPL-1.0 is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/EPL-1.0 (sha256 e242cdcc87b7be1334687d132851ec9fbad00ae7b1ab2d2ad7b5187e7261de02), against the SPDX 3.28.0 template EPL-1.0 with the strict matcher (suite-c calibration, 14.11.2026): UNDECIDED (the regex ran beyond 30 s; never counted as a match)."
+  "FreeType":
+    tier: spdx
+    value: "FTL"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[FreeType] = \"FTL\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): FreeType is no SPDX 3.28.0 identifier, FTL is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/FTL (sha256 ced6622122ce451cb1ea0c3c3f507a640e2a44c075c04900ddd9fae8acb5369f), against the SPDX 3.28.0 template FTL with the strict matcher (suite-c calibration, 14.11.2026): MATCH."
+  "GPL-1":
+    tier: spdx
+    value: "GPL-1.0-only"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[GPL-1] = \"GPL-1.0-only\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): GPL-1 is no SPDX 3.28.0 identifier, GPL-1.0-only is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/GPL-1.0-only (sha256 fa5a059d712f243d4d2b3b5474f4ea7eb4f8a948f4bd7b4c95769ec739efab0a), against the SPDX 3.28.0 template GPL-1.0-only with the strict matcher (suite-c calibration, 14.11.2026): NO MATCH by the strict reading (poky's file adds a title line before the licence; a form difference the guidelines' title, copyright-symbol or end-text rules bridge, which the strict matcher leaves out)."
+  "GPL-1+":
+    tier: spdx
+    value: "GPL-1.0-or-later"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[GPL-1+] = \"GPL-1.0-or-later\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): GPL-1+ is no SPDX 3.28.0 identifier, GPL-1.0-or-later is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/GPL-1.0-or-later (sha256 0155ef252474a7e6dad095fc3d4018a44687131362e80b4bb8fb184d874456a3), against the SPDX 3.28.0 template GPL-1.0-or-later with the strict matcher (suite-c calibration, 14.11.2026): MATCH."
+  "GPL-1.0":
+    tier: spdx
+    value: "GPL-1.0-only"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[GPL-1.0] = \"GPL-1.0-only\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): GPL-1.0 is deprecated in SPDX 3.28.0, GPL-1.0-only is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/GPL-1.0-only (sha256 fa5a059d712f243d4d2b3b5474f4ea7eb4f8a948f4bd7b4c95769ec739efab0a), against the SPDX 3.28.0 template GPL-1.0-only with the strict matcher (suite-c calibration, 14.11.2026): NO MATCH by the strict reading (poky's file adds a title line before the licence; a form difference the guidelines' title, copyright-symbol or end-text rules bridge, which the strict matcher leaves out)."
+  "GPL-1.0+":
+    tier: spdx
+    value: "GPL-1.0-or-later"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[GPL-1.0+] = \"GPL-1.0-or-later\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): GPL-1.0+ is deprecated in SPDX 3.28.0, GPL-1.0-or-later is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/GPL-1.0-or-later (sha256 0155ef252474a7e6dad095fc3d4018a44687131362e80b4bb8fb184d874456a3), against the SPDX 3.28.0 template GPL-1.0-or-later with the strict matcher (suite-c calibration, 14.11.2026): MATCH."
+  "GPL-2":
+    tier: spdx
+    value: "GPL-2.0-only"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[GPL-2] = \"GPL-2.0-only\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): GPL-2 is no SPDX 3.28.0 identifier, GPL-2.0-only is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/GPL-2.0-only (sha256 f89c8bdbf6eb77e64b5cc53233b446bca77f1d1dae576c81925970be5ecfc891), against the SPDX 3.28.0 template GPL-2.0-only with the strict matcher (suite-c calibration, 14.11.2026): MATCH."
+  "GPL-2+":
+    tier: spdx
+    value: "GPL-2.0-or-later"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[GPL-2+] = \"GPL-2.0-or-later\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): GPL-2+ is no SPDX 3.28.0 identifier, GPL-2.0-or-later is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/GPL-2.0-or-later (sha256 606aa26338f69ce178f1cbc648b7574aec4b5bbaeb20f4df36ff49010cb8fbbd), against the SPDX 3.28.0 template GPL-2.0-or-later with the strict matcher (suite-c calibration, 14.11.2026): UNDECIDED (the regex ran beyond 30 s; never counted as a match)."
+  "GPL-2.0":
+    tier: spdx
+    value: "GPL-2.0-only"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[GPL-2.0] = \"GPL-2.0-only\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): GPL-2.0 is deprecated in SPDX 3.28.0, GPL-2.0-only is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/GPL-2.0-only (sha256 f89c8bdbf6eb77e64b5cc53233b446bca77f1d1dae576c81925970be5ecfc891), against the SPDX 3.28.0 template GPL-2.0-only with the strict matcher (suite-c calibration, 14.11.2026): MATCH."
+  "GPL-2.0+":
+    tier: spdx
+    value: "GPL-2.0-or-later"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[GPL-2.0+] = \"GPL-2.0-or-later\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): GPL-2.0+ is deprecated in SPDX 3.28.0, GPL-2.0-or-later is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/GPL-2.0-or-later (sha256 606aa26338f69ce178f1cbc648b7574aec4b5bbaeb20f4df36ff49010cb8fbbd), against the SPDX 3.28.0 template GPL-2.0-or-later with the strict matcher (suite-c calibration, 14.11.2026): UNDECIDED (the regex ran beyond 30 s; never counted as a match)."
+  "GPL-3":
+    tier: spdx
+    value: "GPL-3.0-only"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[GPL-3] = \"GPL-3.0-only\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): GPL-3 is no SPDX 3.28.0 identifier, GPL-3.0-only is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/GPL-3.0-only (sha256 dbf6e18f46317b01da69dfaefdedb707e8682eb4dc1b4916dc3213bcb73012f0), against the SPDX 3.28.0 template GPL-3.0-only with the strict matcher (suite-c calibration, 14.11.2026): MATCH."
+  "GPL-3+":
+    tier: spdx
+    value: "GPL-3.0-or-later"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[GPL-3+] = \"GPL-3.0-or-later\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): GPL-3+ is no SPDX 3.28.0 identifier, GPL-3.0-or-later is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/GPL-3.0-or-later (sha256 2ca9503d76d1ffab14f599b4741382eec11face60ad1f0d7a41897809003a286), against the SPDX 3.28.0 template GPL-3.0-or-later with the strict matcher (suite-c calibration, 14.11.2026): UNDECIDED (the regex ran beyond 30 s; never counted as a match)."
+  "GPL-3.0":
+    tier: spdx
+    value: "GPL-3.0-only"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[GPL-3.0] = \"GPL-3.0-only\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): GPL-3.0 is deprecated in SPDX 3.28.0, GPL-3.0-only is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/GPL-3.0-only (sha256 dbf6e18f46317b01da69dfaefdedb707e8682eb4dc1b4916dc3213bcb73012f0), against the SPDX 3.28.0 template GPL-3.0-only with the strict matcher (suite-c calibration, 14.11.2026): MATCH."
+  "GPL-3.0+":
+    tier: spdx
+    value: "GPL-3.0-or-later"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[GPL-3.0+] = \"GPL-3.0-or-later\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): GPL-3.0+ is deprecated in SPDX 3.28.0, GPL-3.0-or-later is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/GPL-3.0-or-later (sha256 2ca9503d76d1ffab14f599b4741382eec11face60ad1f0d7a41897809003a286), against the SPDX 3.28.0 template GPL-3.0-or-later with the strict matcher (suite-c calibration, 14.11.2026): UNDECIDED (the regex ran beyond 30 s; never counted as a match)."
+  "GPLv1":
+    tier: spdx
+    value: "GPL-1.0-only"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[GPLv1] = \"GPL-1.0-only\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): GPLv1 is no SPDX 3.28.0 identifier, GPL-1.0-only is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/GPL-1.0-only (sha256 fa5a059d712f243d4d2b3b5474f4ea7eb4f8a948f4bd7b4c95769ec739efab0a), against the SPDX 3.28.0 template GPL-1.0-only with the strict matcher (suite-c calibration, 14.11.2026): NO MATCH by the strict reading (poky's file adds a title line before the licence; a form difference the guidelines' title, copyright-symbol or end-text rules bridge, which the strict matcher leaves out)."
+  "GPLv1+":
+    tier: spdx
+    value: "GPL-1.0-or-later"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[GPLv1+] = \"GPL-1.0-or-later\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): GPLv1+ is no SPDX 3.28.0 identifier, GPL-1.0-or-later is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/GPL-1.0-or-later (sha256 0155ef252474a7e6dad095fc3d4018a44687131362e80b4bb8fb184d874456a3), against the SPDX 3.28.0 template GPL-1.0-or-later with the strict matcher (suite-c calibration, 14.11.2026): MATCH."
+  "GPLv1.0":
+    tier: spdx
+    value: "GPL-1.0-only"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[GPLv1.0] = \"GPL-1.0-only\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): GPLv1.0 is no SPDX 3.28.0 identifier, GPL-1.0-only is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/GPL-1.0-only (sha256 fa5a059d712f243d4d2b3b5474f4ea7eb4f8a948f4bd7b4c95769ec739efab0a), against the SPDX 3.28.0 template GPL-1.0-only with the strict matcher (suite-c calibration, 14.11.2026): NO MATCH by the strict reading (poky's file adds a title line before the licence; a form difference the guidelines' title, copyright-symbol or end-text rules bridge, which the strict matcher leaves out)."
+  "GPLv1.0+":
+    tier: spdx
+    value: "GPL-1.0-or-later"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[GPLv1.0+] = \"GPL-1.0-or-later\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): GPLv1.0+ is no SPDX 3.28.0 identifier, GPL-1.0-or-later is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/GPL-1.0-or-later (sha256 0155ef252474a7e6dad095fc3d4018a44687131362e80b4bb8fb184d874456a3), against the SPDX 3.28.0 template GPL-1.0-or-later with the strict matcher (suite-c calibration, 14.11.2026): MATCH."
+  "GPLv2":
+    tier: spdx
+    value: "GPL-2.0-only"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[GPLv2] = \"GPL-2.0-only\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): GPLv2 is no SPDX 3.28.0 identifier, GPL-2.0-only is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/GPL-2.0-only (sha256 f89c8bdbf6eb77e64b5cc53233b446bca77f1d1dae576c81925970be5ecfc891), against the SPDX 3.28.0 template GPL-2.0-only with the strict matcher (suite-c calibration, 14.11.2026): MATCH."
+  "GPLv2+":
+    tier: spdx
+    value: "GPL-2.0-or-later"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[GPLv2+] = \"GPL-2.0-or-later\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): GPLv2+ is no SPDX 3.28.0 identifier, GPL-2.0-or-later is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/GPL-2.0-or-later (sha256 606aa26338f69ce178f1cbc648b7574aec4b5bbaeb20f4df36ff49010cb8fbbd), against the SPDX 3.28.0 template GPL-2.0-or-later with the strict matcher (suite-c calibration, 14.11.2026): UNDECIDED (the regex ran beyond 30 s; never counted as a match)."
+  "GPLv2.0":
+    tier: spdx
+    value: "GPL-2.0-only"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[GPLv2.0] = \"GPL-2.0-only\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): GPLv2.0 is no SPDX 3.28.0 identifier, GPL-2.0-only is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/GPL-2.0-only (sha256 f89c8bdbf6eb77e64b5cc53233b446bca77f1d1dae576c81925970be5ecfc891), against the SPDX 3.28.0 template GPL-2.0-only with the strict matcher (suite-c calibration, 14.11.2026): MATCH."
+  "GPLv2.0+":
+    tier: spdx
+    value: "GPL-2.0-or-later"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[GPLv2.0+] = \"GPL-2.0-or-later\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): GPLv2.0+ is no SPDX 3.28.0 identifier, GPL-2.0-or-later is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/GPL-2.0-or-later (sha256 606aa26338f69ce178f1cbc648b7574aec4b5bbaeb20f4df36ff49010cb8fbbd), against the SPDX 3.28.0 template GPL-2.0-or-later with the strict matcher (suite-c calibration, 14.11.2026): UNDECIDED (the regex ran beyond 30 s; never counted as a match)."
+  "GPLv3":
+    tier: spdx
+    value: "GPL-3.0-only"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[GPLv3] = \"GPL-3.0-only\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): GPLv3 is no SPDX 3.28.0 identifier, GPL-3.0-only is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/GPL-3.0-only (sha256 dbf6e18f46317b01da69dfaefdedb707e8682eb4dc1b4916dc3213bcb73012f0), against the SPDX 3.28.0 template GPL-3.0-only with the strict matcher (suite-c calibration, 14.11.2026): MATCH."
+  "GPLv3+":
+    tier: spdx
+    value: "GPL-3.0-or-later"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[GPLv3+] = \"GPL-3.0-or-later\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): GPLv3+ is no SPDX 3.28.0 identifier, GPL-3.0-or-later is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/GPL-3.0-or-later (sha256 2ca9503d76d1ffab14f599b4741382eec11face60ad1f0d7a41897809003a286), against the SPDX 3.28.0 template GPL-3.0-or-later with the strict matcher (suite-c calibration, 14.11.2026): UNDECIDED (the regex ran beyond 30 s; never counted as a match)."
+  "GPLv3.0":
+    tier: spdx
+    value: "GPL-3.0-only"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[GPLv3.0] = \"GPL-3.0-only\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): GPLv3.0 is no SPDX 3.28.0 identifier, GPL-3.0-only is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/GPL-3.0-only (sha256 dbf6e18f46317b01da69dfaefdedb707e8682eb4dc1b4916dc3213bcb73012f0), against the SPDX 3.28.0 template GPL-3.0-only with the strict matcher (suite-c calibration, 14.11.2026): MATCH."
+  "GPLv3.0+":
+    tier: spdx
+    value: "GPL-3.0-or-later"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[GPLv3.0+] = \"GPL-3.0-or-later\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): GPLv3.0+ is no SPDX 3.28.0 identifier, GPL-3.0-or-later is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/GPL-3.0-or-later (sha256 2ca9503d76d1ffab14f599b4741382eec11face60ad1f0d7a41897809003a286), against the SPDX 3.28.0 template GPL-3.0-or-later with the strict matcher (suite-c calibration, 14.11.2026): UNDECIDED (the regex ran beyond 30 s; never counted as a match)."
+  "LGPL-2.0":
+    tier: spdx
+    value: "LGPL-2.0-only"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[LGPL-2.0] = \"LGPL-2.0-only\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): LGPL-2.0 is deprecated in SPDX 3.28.0, LGPL-2.0-only is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/LGPL-2.0-only (sha256 c1530418e84d8f1e57f134746f021ba520c730811dc43cfcd51df2341e68e5a3), against the SPDX 3.28.0 template LGPL-2.0-only with the strict matcher (suite-c calibration, 14.11.2026): NO MATCH by the strict reading (poky's file lacks the repeated licence heading before 'TERMS AND CONDITIONS'; a form difference the guidelines' title, copyright-symbol or end-text rules bridge, which the strict matcher leaves out)."
+  "LGPL-2.0+":
+    tier: spdx
+    value: "LGPL-2.0-or-later"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[LGPL-2.0+] = \"LGPL-2.0-or-later\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): LGPL-2.0+ is deprecated in SPDX 3.28.0, LGPL-2.0-or-later is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/LGPL-2.0-or-later (sha256 de588a8b1c41fe73ffe1201f9d12c718a988ed8e1302929625a6e7c2bced7461), against the SPDX 3.28.0 template LGPL-2.0-or-later with the strict matcher (suite-c calibration, 14.11.2026): NO MATCH by the strict reading (poky's file lacks the repeated licence heading before 'TERMS AND CONDITIONS'; a form difference the guidelines' title, copyright-symbol or end-text rules bridge, which the strict matcher leaves out)."
+  "LGPL-2.1":
+    tier: spdx
+    value: "LGPL-2.1-only"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[LGPL-2.1] = \"LGPL-2.1-only\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): LGPL-2.1 is deprecated in SPDX 3.28.0, LGPL-2.1-only is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/LGPL-2.1-only (sha256 041234c81fd6fe6c531ea1a886b9e740b9ee06759d1a910a14edbd06f4aa62c7), against the SPDX 3.28.0 template LGPL-2.1-only with the strict matcher (suite-c calibration, 14.11.2026): NO MATCH by the strict reading (poky's file lacks the repeated licence heading before 'TERMS AND CONDITIONS'; a form difference the guidelines' title, copyright-symbol or end-text rules bridge, which the strict matcher leaves out)."
+  "LGPL-2.1+":
+    tier: spdx
+    value: "LGPL-2.1-or-later"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[LGPL-2.1+] = \"LGPL-2.1-or-later\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): LGPL-2.1+ is deprecated in SPDX 3.28.0, LGPL-2.1-or-later is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/LGPL-2.1-or-later (sha256 1ccf09bf2f598308df4bed9cd8e9657dc5cd0973d2800318f2e241486e2edf3f), against the SPDX 3.28.0 template LGPL-2.1-or-later with the strict matcher (suite-c calibration, 14.11.2026): NO MATCH by the strict reading (poky's file lacks the repeated licence heading before 'TERMS AND CONDITIONS'; a form difference the guidelines' title, copyright-symbol or end-text rules bridge, which the strict matcher leaves out)."
+  "LGPL-3.0":
+    tier: spdx
+    value: "LGPL-3.0-only"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[LGPL-3.0] = \"LGPL-3.0-only\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): LGPL-3.0 is deprecated in SPDX 3.28.0, LGPL-3.0-only is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/LGPL-3.0-only (sha256 2900c74f8dfa8054f809774bc210280d1bb4bbcbae7ab63f3659cb4b77f73d2e), against the SPDX 3.28.0 template LGPL-3.0-only with the strict matcher (suite-c calibration, 14.11.2026): NO MATCH by the strict reading (poky's file writes the copyright symbol, the template '(c)'; a form difference the guidelines' title, copyright-symbol or end-text rules bridge, which the strict matcher leaves out)."
+  "LGPL-3.0+":
+    tier: spdx
+    value: "LGPL-3.0-or-later"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[LGPL-3.0+] = \"LGPL-3.0-or-later\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): LGPL-3.0+ is deprecated in SPDX 3.28.0, LGPL-3.0-or-later is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/LGPL-3.0-or-later (sha256 476b03829862ab7e3ed920f87fad3de3c995f7dd93c26476eb40f0117de43fdc), against the SPDX 3.28.0 template LGPL-3.0-or-later with the strict matcher (suite-c calibration, 14.11.2026): MATCH."
+  "LGPL2.1":
+    tier: spdx
+    value: "LGPL-2.1-only"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[LGPL2.1] = \"LGPL-2.1-only\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): LGPL2.1 is no SPDX 3.28.0 identifier, LGPL-2.1-only is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/LGPL-2.1-only (sha256 041234c81fd6fe6c531ea1a886b9e740b9ee06759d1a910a14edbd06f4aa62c7), against the SPDX 3.28.0 template LGPL-2.1-only with the strict matcher (suite-c calibration, 14.11.2026): NO MATCH by the strict reading (poky's file lacks the repeated licence heading before 'TERMS AND CONDITIONS'; a form difference the guidelines' title, copyright-symbol or end-text rules bridge, which the strict matcher leaves out)."
+  "LGPL2.1+":
+    tier: spdx
+    value: "LGPL-2.1-or-later"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[LGPL2.1+] = \"LGPL-2.1-or-later\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): LGPL2.1+ is no SPDX 3.28.0 identifier, LGPL-2.1-or-later is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/LGPL-2.1-or-later (sha256 1ccf09bf2f598308df4bed9cd8e9657dc5cd0973d2800318f2e241486e2edf3f), against the SPDX 3.28.0 template LGPL-2.1-or-later with the strict matcher (suite-c calibration, 14.11.2026): NO MATCH by the strict reading (poky's file lacks the repeated licence heading before 'TERMS AND CONDITIONS'; a form difference the guidelines' title, copyright-symbol or end-text rules bridge, which the strict matcher leaves out)."
+  "LGPLv2":
+    tier: spdx
+    value: "LGPL-2.0-only"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[LGPLv2] = \"LGPL-2.0-only\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): LGPLv2 is no SPDX 3.28.0 identifier, LGPL-2.0-only is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/LGPL-2.0-only (sha256 c1530418e84d8f1e57f134746f021ba520c730811dc43cfcd51df2341e68e5a3), against the SPDX 3.28.0 template LGPL-2.0-only with the strict matcher (suite-c calibration, 14.11.2026): NO MATCH by the strict reading (poky's file lacks the repeated licence heading before 'TERMS AND CONDITIONS'; a form difference the guidelines' title, copyright-symbol or end-text rules bridge, which the strict matcher leaves out)."
+  "LGPLv2+":
+    tier: spdx
+    value: "LGPL-2.0-or-later"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[LGPLv2+] = \"LGPL-2.0-or-later\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): LGPLv2+ is no SPDX 3.28.0 identifier, LGPL-2.0-or-later is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/LGPL-2.0-or-later (sha256 de588a8b1c41fe73ffe1201f9d12c718a988ed8e1302929625a6e7c2bced7461), against the SPDX 3.28.0 template LGPL-2.0-or-later with the strict matcher (suite-c calibration, 14.11.2026): NO MATCH by the strict reading (poky's file lacks the repeated licence heading before 'TERMS AND CONDITIONS'; a form difference the guidelines' title, copyright-symbol or end-text rules bridge, which the strict matcher leaves out)."
+  "LGPLv2.0":
+    tier: spdx
+    value: "LGPL-2.0-only"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[LGPLv2.0] = \"LGPL-2.0-only\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): LGPLv2.0 is no SPDX 3.28.0 identifier, LGPL-2.0-only is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/LGPL-2.0-only (sha256 c1530418e84d8f1e57f134746f021ba520c730811dc43cfcd51df2341e68e5a3), against the SPDX 3.28.0 template LGPL-2.0-only with the strict matcher (suite-c calibration, 14.11.2026): NO MATCH by the strict reading (poky's file lacks the repeated licence heading before 'TERMS AND CONDITIONS'; a form difference the guidelines' title, copyright-symbol or end-text rules bridge, which the strict matcher leaves out)."
+  "LGPLv2.0+":
+    tier: spdx
+    value: "LGPL-2.0-or-later"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[LGPLv2.0+] = \"LGPL-2.0-or-later\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): LGPLv2.0+ is no SPDX 3.28.0 identifier, LGPL-2.0-or-later is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/LGPL-2.0-or-later (sha256 de588a8b1c41fe73ffe1201f9d12c718a988ed8e1302929625a6e7c2bced7461), against the SPDX 3.28.0 template LGPL-2.0-or-later with the strict matcher (suite-c calibration, 14.11.2026): NO MATCH by the strict reading (poky's file lacks the repeated licence heading before 'TERMS AND CONDITIONS'; a form difference the guidelines' title, copyright-symbol or end-text rules bridge, which the strict matcher leaves out)."
+  "LGPLv2.1":
+    tier: spdx
+    value: "LGPL-2.1-only"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[LGPLv2.1] = \"LGPL-2.1-only\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): LGPLv2.1 is no SPDX 3.28.0 identifier, LGPL-2.1-only is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/LGPL-2.1-only (sha256 041234c81fd6fe6c531ea1a886b9e740b9ee06759d1a910a14edbd06f4aa62c7), against the SPDX 3.28.0 template LGPL-2.1-only with the strict matcher (suite-c calibration, 14.11.2026): NO MATCH by the strict reading (poky's file lacks the repeated licence heading before 'TERMS AND CONDITIONS'; a form difference the guidelines' title, copyright-symbol or end-text rules bridge, which the strict matcher leaves out)."
+  "LGPLv2.1+":
+    tier: spdx
+    value: "LGPL-2.1-or-later"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[LGPLv2.1+] = \"LGPL-2.1-or-later\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): LGPLv2.1+ is no SPDX 3.28.0 identifier, LGPL-2.1-or-later is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/LGPL-2.1-or-later (sha256 1ccf09bf2f598308df4bed9cd8e9657dc5cd0973d2800318f2e241486e2edf3f), against the SPDX 3.28.0 template LGPL-2.1-or-later with the strict matcher (suite-c calibration, 14.11.2026): NO MATCH by the strict reading (poky's file lacks the repeated licence heading before 'TERMS AND CONDITIONS'; a form difference the guidelines' title, copyright-symbol or end-text rules bridge, which the strict matcher leaves out)."
+  "LGPLv3":
+    tier: spdx
+    value: "LGPL-3.0-only"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[LGPLv3] = \"LGPL-3.0-only\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): LGPLv3 is no SPDX 3.28.0 identifier, LGPL-3.0-only is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/LGPL-3.0-only (sha256 2900c74f8dfa8054f809774bc210280d1bb4bbcbae7ab63f3659cb4b77f73d2e), against the SPDX 3.28.0 template LGPL-3.0-only with the strict matcher (suite-c calibration, 14.11.2026): NO MATCH by the strict reading (poky's file writes the copyright symbol, the template '(c)'; a form difference the guidelines' title, copyright-symbol or end-text rules bridge, which the strict matcher leaves out)."
+  "LGPLv3+":
+    tier: spdx
+    value: "LGPL-3.0-or-later"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[LGPLv3+] = \"LGPL-3.0-or-later\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): LGPLv3+ is no SPDX 3.28.0 identifier, LGPL-3.0-or-later is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/LGPL-3.0-or-later (sha256 476b03829862ab7e3ed920f87fad3de3c995f7dd93c26476eb40f0117de43fdc), against the SPDX 3.28.0 template LGPL-3.0-or-later with the strict matcher (suite-c calibration, 14.11.2026): MATCH."
+  "MPL-1":
+    tier: spdx
+    value: "MPL-1.0"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[MPL-1] = \"MPL-1.0\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): MPL-1 is no SPDX 3.28.0 identifier, MPL-1.0 is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/MPL-1.0 (sha256 ca103eae270d887effd5f75990cab448bdbf97c85af6dd2eb030d891478ea87a), against the SPDX 3.28.0 template MPL-1.0 with the strict matcher (suite-c calibration, 14.11.2026): MATCH."
+  "MPLv1":
+    tier: spdx
+    value: "MPL-1.0"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[MPLv1] = \"MPL-1.0\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): MPLv1 is no SPDX 3.28.0 identifier, MPL-1.0 is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/MPL-1.0 (sha256 ca103eae270d887effd5f75990cab448bdbf97c85af6dd2eb030d891478ea87a), against the SPDX 3.28.0 template MPL-1.0 with the strict matcher (suite-c calibration, 14.11.2026): MATCH."
+  "MPLv1.1":
+    tier: spdx
+    value: "MPL-1.1"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[MPLv1.1] = \"MPL-1.1\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): MPLv1.1 is no SPDX 3.28.0 identifier, MPL-1.1 is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/MPL-1.1 (sha256 babda8b3b5fba74d88c3bee5f6df583f56f1df7483289a84a9357158e9e0d965), against the SPDX 3.28.0 template MPL-1.1 with the strict matcher (suite-c calibration, 14.11.2026): MATCH."
+  "MPLv2":
+    tier: spdx
+    value: "MPL-2.0"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[MPLv2] = \"MPL-2.0\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): MPLv2 is no SPDX 3.28.0 identifier, MPL-2.0 is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/MPL-2.0 (sha256 fab3dd6bdab226f1c08630b1dd917e11fcb4ec5e1e020e2c16f83a0a13863e85), against the SPDX 3.28.0 template MPL-2.0 with the strict matcher (suite-c calibration, 14.11.2026): UNDECIDED (the regex ran beyond 30 s; never counted as a match)."
+  "Nauman":
+    tier: spdx
+    value: "Naumen"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[Nauman] = \"Naumen\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): Nauman is no SPDX 3.28.0 identifier, Naumen is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/Naumen (sha256 ab999583e09a53632496f4614a2f587f4ed19cecb57a558aed92a0d1a4f3da79), against the SPDX 3.28.0 template Naumen with the strict matcher (suite-c calibration, 14.11.2026): MATCH."
+  "PSF":
+    tier: spdx
+    value: "PSF-2.0"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[PSF] = \"PSF-2.0\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): PSF is no SPDX 3.28.0 identifier, PSF-2.0 is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/PSF-2.0 (sha256 c9662943cf6c15f1098001f97e77fa63755d8d5d32f201de4abf7406fe062fba), against the SPDX 3.28.0 template PSF-2.0 with the strict matcher (suite-c calibration, 14.11.2026): MATCH."
+  "PSFv2":
+    tier: spdx
+    value: "PSF-2.0"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[PSFv2] = \"PSF-2.0\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): PSFv2 is no SPDX 3.28.0 identifier, PSF-2.0 is a current SPDX 3.28.0 identifier; OpenEmbedded resolves the licence file through this mapping, so the build carries the target's canonical text. 2) That text, poky common-licenses/PSF-2.0 (sha256 c9662943cf6c15f1098001f97e77fa63755d8d5d32f201de4abf7406fe062fba), against the SPDX 3.28.0 template PSF-2.0 with the strict matcher (suite-c calibration, 14.11.2026): MATCH."
+  "SGIv1":
+    tier: spdx
+    value: "SGI-OpenGL"
+    evidence: "Two links. 1) poky's own mapping SPDXLICENSEMAP[SGIv1] = \"SGI-1\" in poky meta/conf/licenses.conf (kirkstone 445a6223 = scarthgap b6ae714, sha256 ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41): SGIv1 and SGI-1 are no SPDX 3.28.0 identifiers; OpenEmbedded resolves the licence file through this mapping, so the build carries the text common-licenses/SGI-1. 2) That text matches the SPDX 3.28.0 template SGI-OpenGL as a whole with the strict matcher (see the entry SGI-1): MATCH. The value is SGI-1's."

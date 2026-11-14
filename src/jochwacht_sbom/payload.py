@@ -79,6 +79,9 @@ class CheckComponent(BaseModel):
     #: the shared core's (sbom/build_files.FileRecord, Creator).
     local_license: str = Field(default="", exclude=True)
     local_license_origin: str = Field(default="", exclude=True)
+    #: The build's own words that no tier of TR-03183-2 §6.1 resolves (Yocto):
+    #: written as license.name, never as an identifier.
+    local_license_is_text: bool = Field(default=False, exclude=True)
     local_cpe: str = Field(default="", exclude=True)
     patches: list[dict[str, Any]] = Field(default_factory=list, exclude=True)
     delivered_files: list[Any] = Field(default_factory=list, exclude=True)

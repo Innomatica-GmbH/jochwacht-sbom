@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from jochwacht_sbom.sbom.build_files_yocto import (
+    ManifestUnreadableError,
     YoctoBuildEvidence,
     yocto_build,
     yocto_manifest_entries,
@@ -63,13 +64,26 @@ def find_yocto_builds(path: Path) -> list[Path]:
     return found
 
 
-def read_yocto_builds(path: Path) -> list[YoctoBuildRead]:
+def read_yocto_builds(path: Path, gaps: list[tuple[Path, str]] | None = None,
+                      ) -> list[YoctoBuildRead]:
     """Every Yocto build under *path*, read by the shared core with the
     image manifest's names (the suite passes its create-spdx names; the
-    evidence per name is the same, tested in the suite)."""
+    evidence per name is the same, tested in the suite).
+
+    *gaps*: receives (TMPDIR, reason) for a build whose stated image's
+    manifest is missing or unknown (an unusable testdata.json): a state of
+    the customer's build, not a defect of the reader (coordination,
+    14.11.2026). Without *gaps* the ManifestUnreadableError is raised.
+    """
     out: list[YoctoBuildRead] = []
     for tmp in find_yocto_builds(path):
-        packages = yocto_manifest_entries(tmp)
+        try:
+            packages = yocto_manifest_entries(tmp)
+        except ManifestUnreadableError as exc:
+            if gaps is None:
+                raise
+            gaps.append((tmp, str(exc)))
+            continue
         if not packages:
             continue
         out.append(YoctoBuildRead(tmp, packages, yocto_build(tmp, [n for n, _ in packages])))

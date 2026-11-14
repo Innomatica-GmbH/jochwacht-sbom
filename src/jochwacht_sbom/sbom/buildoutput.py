@@ -140,27 +140,28 @@ def find_build_output(path: Path, *, max_depth: int = 5) -> tuple[list[Path], li
     return manifests, legal_dirs
 
 
-def _stated_candidates(folder: Path) -> list[list[str]] | None:
+def _stated_candidates(folder: Path) -> list[tuple[str, list[str]]] | None:
     """Per regular ``*.testdata.json`` in *folder* (the dated file; the
-    undated name is a link): the candidate names of its manifest, by the one
-    rule of the core (build_files_yocto.image_file_names: IMAGE_MANIFEST,
-    IMAGE_NAME + IMAGE_NAME_SUFFIX, IMAGE_NAME, IMAGE_NAME + ".rootfs").
-    None when no testdata.json states an image."""
+    undated name is a link): its name and the candidate names of its
+    manifest, by the one rule of the core (build_files_yocto.image_file_names:
+    IMAGE_MANIFEST, IMAGE_NAME + IMAGE_NAME_SUFFIX, IMAGE_NAME, IMAGE_NAME +
+    ".rootfs"). A testdata.json that cannot be read or states no IMAGE_NAME
+    still states an image, with no candidate (its manifest is unknown).
+    None when no testdata.json is in the folder."""
     from jochwacht_sbom.sbom.build_files_yocto import image_file_names
 
-    stated: list[list[str]] = []
+    stated: list[tuple[str, list[str]]] = []
     for testdata in sorted(folder.glob("*.testdata.json")):
         if testdata.is_symlink() or not testdata.is_file():
             continue
+        data: object = None
         try:
-            if testdata.stat().st_size > MAX_TESTDATA_BYTES:
-                continue
-            data = json.loads(testdata.read_text(encoding="utf-8"))
+            if testdata.stat().st_size <= MAX_TESTDATA_BYTES:
+                data = json.loads(testdata.read_text(encoding="utf-8"))
         except (OSError, ValueError, RecursionError):
-            continue
+            data = None
         candidates = image_file_names(data, "manifest") if isinstance(data, dict) else []
-        if candidates:
-            stated.append(candidates)
+        stated.append((testdata.name, candidates))
     return stated or None
 
 
@@ -191,13 +192,22 @@ def stated_image_manifests(manifests: list[Path]) -> tuple[list[Path], list[str]
         regular = {p.name: p for p in found if not p.is_symlink()}
         chosen: list[Path] = []
         missing = ""
-        for candidates in stated:
+        unknown = ""
+        for testdata_name, candidates in stated:
+            if not candidates:
+                unknown = testdata_name
+                break
             hit = next((regular[c] for c in candidates if c in regular), None)
             if hit is None:
                 missing = candidates[0]
                 break
             if hit not in chosen:
                 chosen.append(hit)
+        if unknown:
+            notes.append(f"skipped yocto image manifests in {_clean(folder.name)}: "
+                         f"{_clean(unknown)} cannot be read or states no IMAGE_NAME, "
+                         "the stated image's manifest is unknown")
+            continue
         if missing:
             notes.append(f"skipped yocto image manifests in {_clean(folder.name)}: the stated "
                          f"image's manifest {_clean(missing)} is missing")

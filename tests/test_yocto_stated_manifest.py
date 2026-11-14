@@ -31,6 +31,10 @@ def test_reads_the_stated_manifest(tmp_path: Path) -> None:
     assert not [f for f in diagnosis.failures() if f.reader == "yocto_build"]
 
 
+def stats_warnings(root: Path) -> list[str]:
+    return list(collect_components(root)[1].build_warnings)
+
+
 def test_never_reads_another_image_s_manifest(tmp_path: Path) -> None:
     root = _yocto(tmp_path)
     folder = root / IMAGES
@@ -38,8 +42,12 @@ def test_never_reads_another_image_s_manifest(tmp_path: Path) -> None:
     (folder / "core-image-minimal-qemux86-64.rootfs.manifest").unlink()
     diagnosis.reset()
     components, _ = collect_components(root)
-    failed = [f for f in diagnosis.failures() if f.reader == "yocto_build"]
-    assert [f.exc_type for f in failed] == ["ManifestUnreadableError"]
+    # Was: recorded as a reader failure ("A defect in jochwacht-sbom").
+    # Coordination, 14.11.2026: a missing manifest of the stated image is a
+    # state of the build, named as a gap; no diagnosis, no blame.
+    assert [f for f in diagnosis.failures() if f.reader == "yocto_build"] == []
+    assert any("the scope of delivery is unknown" in w and "manifest is missing" in w
+               for w in stats_warnings(root))
     # No component carries Yocto build evidence, and (b) no generic row
     # either: nothing of the foreign image is named.
     assert not any(c.ecosystem == "yocto" for c in components)

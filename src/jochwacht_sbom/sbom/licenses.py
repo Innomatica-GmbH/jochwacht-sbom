@@ -176,6 +176,18 @@ def spdx_license_value(raw: object) -> str | None:
     return text
 
 
+def spdx_expression(raw: object) -> str | None:
+    """The canonical SPDX identifier or expression for *raw*, or None.
+
+    The strict rule (every part a listed identifier or ``LicenseRef-``,
+    after WITH a listed exception). For BSI TR-03183-2 §6.1: a license MUST
+    be named by an SPDX identifier or expression; free text cannot replace
+    it (review sicherheit-2, L1, 14.11.2026). A placeholder is None.
+    """
+    text = spdx_license_value(raw)
+    return _strict_expression(text) if text is not None else None
+
+
 def spdx_package_license(element: dict[str, object]) -> str | None:
     """The license of an SPDX package: ``licenseConcluded`` when real, else
     ``licenseDeclared``. The one rule for importer, merge and reader."""
@@ -262,6 +274,12 @@ def normalize_license(
         if _OPERATOR.search(text):
             return LicenseValue("name", " ".join(text.split()))
 
+    if _LICENSE_REF.match(text):
+        # A user-defined reference alone is a valid SPDX expression
+        # (yocto-lizenz-pkgdata, 14.11.2026); ``license.id`` cannot hold it,
+        # free text would make it red.
+        return LicenseValue("expression", text)
+
     if _BARE_ID.match(text):
         # Looking like an identifier is not being one. ``license.id`` is
         # validated against a closed enumeration, so "BSD" or "PSFL" would
@@ -283,9 +301,17 @@ def normalize_license(
 
 
 def cyclonedx_licenses(
-    raw: str | None, *, lookup: object = None,
+    raw: str | None, *, lookup: object = None, as_text: bool = False,
 ) -> list[dict[str, object]]:
-    """The CycloneDX ``licenses`` array for *raw* (empty when it says nothing)."""
+    """The CycloneDX ``licenses`` array for *raw* (empty when it says nothing).
+
+    *as_text*: the caller knows *raw* is free text (a Yocto value no tier of
+    TR-03183-2 §6.1 resolves): written as ``license.name``, never as an
+    identifier, even when it looks like one (a deprecated ``GPL-2.0``).
+    """
+    if as_text:
+        text = " ".join((raw or "").split())
+        return [{"license": {"name": text}}] if text else []
     value = normalize_license(raw, lookup=lookup)
     if value is None:
         return []
@@ -305,3 +331,172 @@ def spdx_license(raw: str | None, *, lookup: object = None) -> str:
     if value is None or value.kind == "name":
         return "NOASSERTION"
     return value.value
+
+
+# ---------------------------------------------------------------------------
+# Yocto: the LICENSE value of a build, in the order of TR-03183-2 §6.1
+# ---------------------------------------------------------------------------
+
+#: Yocto's LICENSE syntax (bitbake oe.license): ``&`` and ``|`` with
+#: parentheses; ``&`` binds tighter, as AND does in SPDX.
+_YOCTO_TOKEN = re.compile(r"[()&|]|[^\s()&|]+")
+#: create-spdx writes a name off the SPDX list as a LicenseRef, sometimes
+#: through the recipe's document: the name is the part after LicenseRef-.
+_YOCTO_REF = re.compile(r"^(?:DocumentRef-[A-Za-z0-9.-]+:)?LicenseRef-(.+)$")
+#: Characters outside the SPDX idstring, replaced in a LicenseRef.
+_REF_UNSAFE = re.compile(r"[^A-Za-z0-9.-]+")
+#: Namespace of the third tier: a name of OpenEmbedded's licence inventory
+#: (poky meta/files/common-licenses), never a customer's own licence.
+YOCTO_REF_PREFIX = "LicenseRef-openembedded-"
+
+
+@lru_cache(maxsize=1)
+def _spdx_deprecated() -> frozenset[str]:
+    """The deprecated SPDX identifiers of the vendored list (canonical spelling)."""
+    raw = yaml.safe_load((_DATA_DIR / "spdx_license_ids.yaml").read_text(encoding="utf-8"))
+    return frozenset(raw.get("deprecated") or ())
+
+
+@lru_cache(maxsize=1)
+def _scancode_refs() -> frozenset[str]:
+    raw = yaml.safe_load(
+        (_DATA_DIR / "scancode_license_refs.yaml").read_text(encoding="utf-8"))
+    return frozenset(str(v) for v in raw["refs"].values())
+
+
+@lru_cache(maxsize=1)
+def openembedded_license_names() -> frozenset[str]:
+    """The names of poky's common-licenses (data/openembedded_common_licenses.yaml),
+    empty while the list is not checked in: then no name reaches tier 3."""
+    path = _DATA_DIR / "openembedded_common_licenses.yaml"
+    if not path.is_file():
+        return frozenset()
+    raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    return frozenset(str(n) for n in (raw.get("names") or {}))
+
+
+def openembedded_ref(name: str) -> str:
+    """``LicenseRef-openembedded-<name>``, characters outside the idstring -> ``-``."""
+    return YOCTO_REF_PREFIX + _REF_UNSAFE.sub("-", name).strip("-")
+
+
+def _current_expression(value: str) -> str | None:
+    """*value* as a strict SPDX expression without a deprecated identifier."""
+    strict = _strict_expression(value)
+    if strict is None:
+        return None
+    deprecated = {d.lower() for d in _spdx_deprecated()}
+    for tok in _EXPR_TOKEN.findall(strict):
+        if tok.rstrip("+").lower() in deprecated or tok.lower() in deprecated:
+            return None
+    return strict
+
+
+@lru_cache(maxsize=1)
+def _yocto_license_map() -> dict[str, str]:
+    """Curated Yocto name -> SPDX value (data/yocto_license_map.yaml).
+
+    An entry counts only when it holds (sicherheit-2 TR1/TR2, 14.11.2026):
+    tier ``spdx`` a current SPDX identifier or expression (a WITH exception
+    included, no deprecated identifier); tier ``scancode`` a reference the
+    checked-in key list has; tier ``openembedded`` a name of poky's
+    common-licenses with exactly its ``LicenseRef-openembedded-`` value.
+    """
+    table = yaml.safe_load((_DATA_DIR / "yocto_license_map.yaml").read_text(encoding="utf-8"))
+    refs, oe_names = _scancode_refs(), openembedded_license_names()
+    out: dict[str, str] = {}
+    for name, entry in table["entries"].items():
+        name, value, tier = str(name), str(entry["value"]), entry["tier"]
+        if tier == "spdx":
+            current = _current_expression(value)
+            if current is not None:
+                out[name] = current
+        elif (tier == "scancode" and value in refs) or (
+                tier == "openembedded" and name in oe_names and value == openembedded_ref(name)):
+            out[name] = value
+    return out
+
+
+def _yocto_part(tok: str) -> str | None:
+    """The SPDX value of one licence name of a Yocto value, or None."""
+    ids, deprecated = _spdx_identifiers(), _spdx_deprecated()
+    ref = _YOCTO_REF.match(tok)
+    if ref is not None and tok in _scancode_refs():
+        return tok
+    name = ref.group(1) if ref is not None else tok
+    if ref is None:
+        canonical = ids.get(name.lower())
+        if canonical is not None and canonical not in deprecated:
+            return canonical
+        base = ids.get(name[:-1].lower()) if name.endswith("+") else None
+        if base is not None and base not in deprecated:
+            return base + "+"
+    value = _yocto_license_map().get(name)
+    if value is None:
+        return None
+    return value
+
+
+def yocto_license_expression(raw: str | None) -> str | None:
+    """The SPDX expression for a Yocto LICENSE value, or None.
+
+    Each licence name in the order of TR-03183-2 §6.1 (coordination,
+    14.11.2026): a current SPDX identifier as it is; every other name, a
+    deprecated identifier and a create-spdx ``LicenseRef-<name>`` included,
+    only through its evidenced entry in data/yocto_license_map.yaml (SPDX by
+    text, else ScanCode, else ``LicenseRef-openembedded-<name>`` for a name
+    of poky's common-licenses). A name without an entry gives None: the
+    value is then free text and red, never attributed to OpenEmbedded.
+    """
+    text = (raw or "").strip()
+    if not text or "${" in text:
+        return None
+    tokens = _YOCTO_TOKEN.findall(text)
+    if len(tokens) > _MAX_EXPR_TOKENS:
+        return None
+    exceptions = _spdx_exceptions()
+    out: list[str] = []
+    for i, tok in enumerate(tokens):
+        if tok == "&":
+            out.append("AND")
+        elif tok == "|":
+            out.append("OR")
+        elif tok in ("(", ")"):
+            out.append(tok)
+        elif tok.upper() in ("AND", "OR", "WITH"):
+            out.append(tok.upper())
+        elif out and out[-1] == "WITH":
+            if tok.lower() not in exceptions:
+                return None
+            out.append(exceptions[tok.lower()])
+        elif tok.casefold() in _PLACEHOLDERS:
+            return None
+        else:
+            part = _yocto_part(tok)
+            if part is None:
+                return None
+            # an entry's expression keeps its grouping inside a larger one;
+            # alone, or already inside the build's own brackets, it needs none
+            enclosed = 0 < i < len(tokens) - 1 and tokens[i - 1] == "(" \
+                and tokens[i + 1] == ")"
+            alone = len(tokens) == 1
+            out.append(f"({part})" if " " in part and not (alone or enclosed) else part)
+    return _strict_expression(" ".join(out))
+
+
+def yocto_license(raw: str | None) -> tuple[str, bool] | None:
+    """(value, is_text) for a licence the Yocto build states, or None.
+
+    The SPDX expression when every name resolves (is_text False); else the
+    build's own words, to be written as free text (``license.name``), which
+    is red in the portal. None when the value states nothing (empty, a
+    placeholder, an unexpanded ``${…}``).
+    """
+    text = " ".join((raw or "").split())
+    if not text or "${" in text:
+        return None
+    if all(tok.casefold() in _PLACEHOLDERS for tok in _YOCTO_TOKEN.findall(text)
+           if tok not in ("&", "|", "(", ")")):
+        return None
+    expression = yocto_license_expression(text)
+    return (expression, False) if expression is not None else (text, True)

@@ -103,7 +103,7 @@ def _with_build_evidence(
                                          version=comp.version)
     props = entry.setdefault("properties", [])
     if comp.local_license and "licenses" not in entry:
-        licences = cyclonedx_licenses(comp.local_license)
+        licences = cyclonedx_licenses(comp.local_license, as_text=comp.local_license_is_text)
         if licences:
             entry["licenses"] = licences
             if isinstance(props, list):
@@ -117,7 +117,8 @@ def _with_build_evidence(
         entry["components"] = cdx_files.file_components(
             comp.delivered_files, parent_ref=ref, package_name=comp.name,
             version=comp.version, package_license=comp.local_license or comp.license,
-            to_licenses=cyclonedx_licenses)
+            to_licenses=lambda text: cyclonedx_licenses(
+                text, as_text=comp.local_license_is_text and text == comp.local_license))
     cdx_files.apply_creator(entry, package_name=comp.name, url=comp.creator_url,
                             origin=comp.creator_origin, gap=comp.creator_gap,
                             field_ok=creator_ok)

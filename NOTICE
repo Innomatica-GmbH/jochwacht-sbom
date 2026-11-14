@@ -8,3 +8,10 @@ version. It is distributed WITHOUT ANY WARRANTY; see the license text below.
 
 Releases up to and including jochwacht-sbom 0.8.6 were published under the MIT
 License and remain available under it.
+
+src/jochwacht_sbom/sbom/data/scancode_license_refs.yaml holds licence keys and
+their SPDX LicenseRef names from the ScanCode LicenseDB
+(https://github.com/aboutcode-org/scancode-licensedb, commit f10c818a2fbf),
+Copyright (c) nexB Inc. and others, licensed under CC-BY-4.0
+(https://creativecommons.org/licenses/by/4.0/). The file was reduced to the
+non-deprecated keys and their LicenseRef names; nothing else was changed.

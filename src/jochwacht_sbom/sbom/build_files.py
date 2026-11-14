@@ -927,6 +927,15 @@ class EntryEvidence:
     not_evidenced: str
     creator: Creator | None
     creator_gap: str
+    #: The licence the build states for the package: the SPDX value TR-03183-2
+    #: §6.1 allows, else the build's own words (see license_is_text); "" = none.
+    #: Yocto only so far (pkgdata); Buildroot's comes with its package.
+    license: str = ""
+    #: Where it was read, e.g. ``yocto:pkgdata runtime/glibc LICENSE``.
+    license_origin: str = ""
+    #: True when ``license`` is the build's own words that no tier of §6.1
+    #: resolves: written as free text (``license.name``), red in the portal.
+    license_is_text: bool = False
 
 
 @dataclass

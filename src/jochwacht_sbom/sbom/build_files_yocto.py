@@ -57,6 +57,7 @@ from jochwacht_sbom.sbom.build_files import (
     outside_warning,
     within,
 )
+from jochwacht_sbom.sbom.licenses import yocto_license
 
 logger = logging.getLogger(__name__)
 
@@ -270,6 +271,56 @@ def _runtime_dirs(tmp: Path, stated: set[str]) -> list[Path]:
     return [d for d in dirs if d.is_dir() and not d.is_symlink() and within(d, tmp)]
 
 
+#: A LICENSE value longer than this is no licence statement; it is not taken.
+MAX_LICENSE_CHARS = 4096
+
+
+def yocto_package_licenses(tmp: Path) -> dict[str, tuple[str, str]]:
+    """Output package name (``PKG``) -> (LICENSE value, where it was read).
+
+    From the pkgdata runtime files of the stated PKGDATA_DIR (every machine
+    when no image states one): the package's own ``LICENSE:<pkg>`` before
+    the recipe's ``LICENSE``, the rule license.manifest follows
+    (coordination, 14.11.2026). A package that two machines license
+    differently gets none; a link or a non-regular file is not read.
+    """
+    _, stated = _image_statements(tmp)
+    found: dict[str, tuple[str, str]] = {}
+    disputed: set[str] = set()
+    for runtime in _runtime_dirs(tmp, stated):
+        for entry in sorted(runtime.iterdir()):
+            pkg = entry.name
+            if pkg.endswith(".packaged") or entry.is_symlink() or not entry.is_file():
+                continue
+            try:
+                text = entry.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            name, own, recipe = pkg, "", ""
+            for line in text.splitlines():
+                key, sep, value = line.partition(": ")
+                if not sep:
+                    continue
+                if key == f"PKG:{pkg}":
+                    name = value.strip() or pkg
+                elif key == f"LICENSE:{pkg}":
+                    own = value.strip()
+                elif key == "LICENSE":
+                    recipe = value.strip()
+            value, key = (own, f"LICENSE:{pkg}") if own else (recipe, "LICENSE")
+            if not value or len(value) > MAX_LICENSE_CHARS:
+                continue
+            said = (_printable(value), f"yocto:pkgdata runtime/{_printable(pkg)} "
+                                       f"{_printable(key)}")
+            known = found.get(name)
+            if known is not None and known[0] != said[0]:
+                disputed.add(name)
+            found.setdefault(name, said)
+    for name in disputed:
+        found.pop(name, None)
+    return found
+
+
 def yocto_feed_evidence(build_dir: Path) -> dict[str, ComponentEvidence]:
     """The package archive per Yocto runtime package (product ships its feed).
 
@@ -402,24 +453,42 @@ def _image_file(image: _Image, extension: str) -> Path | None:
     return None
 
 
-def _stated_images(tmp: Path) -> list[_Image]:
-    """Every image a regular ``*.testdata.json`` describes."""
+#: Largest testdata.json read (the same bound as buildoutput; a real one is a
+#: few hundred KB). A larger one is unreadable: an image is stated, its
+#: manifest unknown (review sicherheit-2).
+MAX_TESTDATA_BYTES = 16 << 20
+
+
+def _testdata(tmp: Path) -> tuple[list[_Image], list[str]]:
+    """Every image a regular ``*.testdata.json`` describes, and the names of
+    those that cannot be read or state no IMAGE_NAME: each still states an
+    image, whose manifest is then unknown (never the folder fallback)."""
     found: list[_Image] = []
+    unreadable: list[str] = []
     images = tmp / "deploy" / "images"
     if not images.is_dir():
-        return found
+        return found, unreadable
     for testdata in sorted(images.glob("*/*.testdata.json")):
         if testdata.is_symlink():
             continue  # the IMAGE_LINK_NAME alias of a dated file
         if not within(testdata.parent, tmp):
             continue  # a machine folder linked from elsewhere (named by outside_roots)
+        data: object = None
         try:
-            data = json.loads(testdata.read_text(encoding="utf-8"))
+            if testdata.stat().st_size <= MAX_TESTDATA_BYTES:
+                data = json.loads(testdata.read_text(encoding="utf-8"))
         except (OSError, ValueError, RecursionError):
-            continue
+            data = None
         if isinstance(data, dict) and isinstance(data.get("IMAGE_NAME"), str):
             found.append(_Image(testdata.parent, data))
-    return found
+        else:
+            unreadable.append(_printable(testdata.name))
+    return found, unreadable
+
+
+def _stated_images(tmp: Path) -> list[_Image]:
+    """Every image a readable regular ``*.testdata.json`` describes."""
+    return _testdata(tmp)[0]
 
 
 def _fstypes(image: _Image) -> list[str]:
@@ -620,9 +689,10 @@ def yocto_product(build_dir: Path) -> tuple[str, str]:
     tmp = _tmp_dir(build_dir)
     if tmp is None:
         return "", ""
+    images, unreadable = _testdata(tmp)
     stated = {(str(i.data.get("IMAGE_BASENAME") or ""), str(i.data.get("PV") or ""))
-              for i in _stated_images(tmp)}
-    if len(stated) != 1:
+              for i in images}
+    if len(stated) != 1 or unreadable:
         return "", ""
     name, version = next(iter(stated))
     return (name, version) if name else ("", "")
@@ -674,7 +744,11 @@ def _manifest_paths(tmp: Path) -> list[Path]:
             read from another image's manifest (coordination 13.11.2026,
             after sicherheit-2: an excluded package leaves the checks).
     """
-    images = _stated_images(tmp)
+    images, unreadable = _testdata(tmp)
+    if unreadable:
+        raise ManifestUnreadableError(
+            f"{unreadable[0]}: a stated image's testdata.json is unreadable, "
+            "its manifest unknown")
     if images:
         paths: list[Path] = []
         for image in images:
@@ -1002,6 +1076,10 @@ def yocto_build(build_dir: Path, names: list[str]) -> YoctoBuildEvidence:
         warnings.append(f"rootfs not read: {images.aborted}")
 
     creators = yocto_creators(build_dir)
+    tmp = _tmp_dir(build_dir)
+    stated_licenses = yocto_package_licenses(tmp) if tmp is not None else {}
+    if stated_licenses:
+        sources.append("yocto:pkgdata LICENSE")
     entries: list[EntryEvidence] = []
     by_name: dict[str, EntryEvidence] = {}
     for name in names:
@@ -1023,6 +1101,14 @@ def yocto_build(build_dir: Path, names: list[str]) -> YoctoBuildEvidence:
             name, out, files, unclassified, reason,
             Creator(said.url, said.origin) if said is not None and said.url else None,
             said.gap if said is not None else "")
+        stated, origin = stated_licenses.get(name, ("", ""))
+        said_licence = yocto_license(stated)
+        if said_licence is not None:
+            # TR-03183-2 §6.1: SPDX, else an evidenced entry (SPDX by text,
+            # ScanCode, OpenEmbedded's own name); what none of them gives
+            # stays the build's words as free text, red in the portal.
+            entry.license, entry.license_is_text = said_licence
+            entry.license_origin = origin
         entries.append(entry)
         by_name.setdefault(name, entry)
 

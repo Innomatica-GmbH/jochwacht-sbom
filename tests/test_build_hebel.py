@@ -155,7 +155,10 @@ def test_the_binary_carries_the_spdx_lists() -> None:
     assert '"src/jochwacht_sbom/sbom/data/*.yaml"' in spec
     data = Path(__file__).resolve().parents[1] / "src" / "jochwacht_sbom" / "sbom" / "data"
     assert {p.name for p in data.glob("*.yaml")} == {
-        "spdx_license_ids.yaml", "spdx_exception_ids.yaml"}
+        "spdx_license_ids.yaml", "spdx_exception_ids.yaml",
+        # the Yocto licence in the order of TR-03183-2 §6.1 (0.21)
+        "yocto_license_map.yaml", "scancode_license_refs.yaml",
+        "openembedded_common_licenses.yaml"}
 
 
 def test_licence_text_that_is_not_valid_spdx_stays_text() -> None:

@@ -1,0 +1,588 @@
+# OpenEmbedded's licence inventory: every file of poky meta/files/common-licenses,
+# by name, with the sha256 of its bytes and the poky lines it was read from
+# (TR-03183-2 §6.1, tier 3: LicenseRef-openembedded-<name> only for a name listed
+# here; coordination and sicherheit-2, 14.11.2026).
+#
+# Measured by suite-c on 14.11.2026:
+#   kirkstone: fetched read-only from https://git.yoctoproject.org/poky at the commit
+#     the kirkstone build #104 names in buildhistory metadata-revs (meta, meta-poky,
+#     meta-yocto-bsp = kirkstone:445a6223929b9a7a62b575093659e3d9e1aba982).
+#     git ls-tree of the directory, sha256:
+#     979d0f73565b0c6a50041b29d5850883ef7dcd42a613fc921b8b184a08116586
+#   scarthgap: a clone of the scarthgap branch at b6ae714 (worktree clean against the
+#     commit); the 40 licence files of the scarthgap build tree #4
+#     (tmp/deploy/licenses/*/generic_*) are byte-identical to it.
+#   Both lines carry the same 481 names with the same bytes.
+source: "poky meta/files/common-licenses"
+lines:
+  kirkstone: {commit: "445a6223929b9a7a62b575093659e3d9e1aba982", tag_or_branch: "kirkstone"}
+  scarthgap: {commit: "b6ae714a1d1bfae8384654a13da15996cac64712", tag_or_branch: "scarthgap"}
+names:
+  "0BSD": {sha256: "e3f18c71e10d673590eb9856c1d79dd3b4b0d65404efb5e8584dbede7edd608b", lines: [kirkstone, scarthgap]}
+  "AAL": {sha256: "025344b574717613937007dd1ebe4463692aef2ef4715e464cce2ad4464cfb40", lines: [kirkstone, scarthgap]}
+  "Abstyles": {sha256: "4ee039bb373cec057f2cf1e320763e08da25a506b0496a09cda5efc07970f303", lines: [kirkstone, scarthgap]}
+  "Adobe": {sha256: "7f0ae3421616818a827bf9a0c0d368e7418661d7ceda819ab5713497a5fc7e01", lines: [kirkstone, scarthgap]}
+  "Adobe-2006": {sha256: "44890cfc9297c506de1b2f43c9050c7984798e6a0c6f3ac07ad829af40695b4a", lines: [kirkstone, scarthgap]}
+  "Adobe-Glyph": {sha256: "dd79441e1c46483562f10a93fadc7f593f337387d43d3381eb6449534e0117a2", lines: [kirkstone, scarthgap]}
+  "ADSL": {sha256: "499fa1d1608a106727aaa4482ff64c45091a2be9f0639f16d8509d39c33f872a", lines: [kirkstone, scarthgap]}
+  "AFL-1.1": {sha256: "1b078d9b349ed33ced8ec94147d61c1bb458a4ae88b2304f45eafb631d73bbb5", lines: [kirkstone, scarthgap]}
+  "AFL-1.2": {sha256: "b120e371612eb2feca0d3faef93bc08c7fdd1fdce03b49c4b00cfe88302ec39a", lines: [kirkstone, scarthgap]}
+  "AFL-2.0": {sha256: "d2f0ad9acdc7c216b49ec9ca7c23d7a10fa80dc681f57b24ed5d378c61a18219", lines: [kirkstone, scarthgap]}
+  "AFL-2.1": {sha256: "ab5305bfeb4d145a4019586525ce45a648308372a02d1c082f407e9e03660d2b", lines: [kirkstone, scarthgap]}
+  "AFL-3.0": {sha256: "9505472b49081c882e380a6f20c7539d6261ecc00b5b827126bc11eecf415145", lines: [kirkstone, scarthgap]}
+  "Afmparse": {sha256: "b3030c3435ea42f8f171446210d1914e704f69d416b4c8cfc240e7a1fc4cb962", lines: [kirkstone, scarthgap]}
+  "AGPL-1.0-only": {sha256: "0cf752be2bb9cdd02256cf540db397d94dc9ae2f8e74c325f62a5f8e7b3e1d86", lines: [kirkstone, scarthgap]}
+  "AGPL-1.0-or-later": {sha256: "0cf752be2bb9cdd02256cf540db397d94dc9ae2f8e74c325f62a5f8e7b3e1d86", lines: [kirkstone, scarthgap]}
+  "AGPL-3.0-only": {sha256: "57c8ff33c9c0cfc3ef00e650a1cc910d7ee479a8bc509f6c9209a7c2a11399d6", lines: [kirkstone, scarthgap]}
+  "AGPL-3.0-or-later": {sha256: "bb1f1ae69336415b990b197ee058aef4b92f31dc02c5ad2a4358ef1960f38bee", lines: [kirkstone, scarthgap]}
+  "Aladdin": {sha256: "e7a871c1033452f86767d6b6ec64e935f96992ba9f62408472556967bcf91f6a", lines: [kirkstone, scarthgap]}
+  "AMDPLPA": {sha256: "68b952125c3cd2641c1070f5e23d2661672d1ade688107044fb6edcd2ef8aa91", lines: [kirkstone, scarthgap]}
+  "AML": {sha256: "5a18e36d6923eaefdb77cd01adaa4c823a0f33fc50071568e4a8f7017aaf8c84", lines: [kirkstone, scarthgap]}
+  "AMPAS": {sha256: "750402327d30ead99395dd862ad388ed18853d99b66d91c5105592b99501a002", lines: [kirkstone, scarthgap]}
+  "ANTLR-PD": {sha256: "ddc9eb2b83a2888fb653874ee9d00f2f8b00e14283524d2357d1b4181588f12d", lines: [kirkstone, scarthgap]}
+  "ANTLR-PD-fallback": {sha256: "782267c0e1e51c2dcd348a454191660fa7d9ca10ead82e74f3fce0bd8083021d", lines: [kirkstone, scarthgap]}
+  "Apache-1.0": {sha256: "a2652e1d0722b41e706649016e238ac2da73e927b11624a052d23a0a431d52b7", lines: [kirkstone, scarthgap]}
+  "Apache-1.1": {sha256: "adcd286a5670f5aeea0da310d54f00ec64f7d4be4919de2742643f4b35c7b948", lines: [kirkstone, scarthgap]}
+  "Apache-2.0": {sha256: "58f1fdcee3211f839f749c1ed97ca87fd56d9d01d729bb74241eca9e2ac710bc", lines: [kirkstone, scarthgap]}
+  "Apache-2.0-with-LLVM-exception": {sha256: "f72b120d1385408e9e380acc020756eb6ba1b461d66c328ea67327ba08d7dcfd", lines: [kirkstone, scarthgap]}
+  "APAFML": {sha256: "708c77776f111da3d7aa6228b78d95e45fb1af359f6144b8655837abb8fc7993", lines: [kirkstone, scarthgap]}
+  "APL-1.0": {sha256: "990677b412e372af379007217aa6a4e4f8c52a3e8cd6a0c9fe3260f730016176", lines: [kirkstone, scarthgap]}
+  "APSL-1.0": {sha256: "a985479220fb634c47f3bf1628405a99b115eb3c0fa5ebb296bfc3d74f015b31", lines: [kirkstone, scarthgap]}
+  "APSL-1.1": {sha256: "cca6337a2a846c4fa2ca32a7a934ca585442e425472c9a6e244e9136008701d6", lines: [kirkstone, scarthgap]}
+  "APSL-1.2": {sha256: "959e878e0909c8b69149046df277ed1178f35b30d59c1db89199b6ce39231891", lines: [kirkstone, scarthgap]}
+  "APSL-2.0": {sha256: "6debc7524d805d1cfac5f65dd1b6f01f548a3e9c85ce409b878927adfe7fdf01", lines: [kirkstone, scarthgap]}
+  "Artistic-1.0": {sha256: "793718c0b4e845fdfeb2018060268d9bbcfc30f74d07b494009b0b268b38e3fe", lines: [kirkstone, scarthgap]}
+  "Artistic-1.0-cl8": {sha256: "a0db94ded05175a102689028b7664aa897caeb8a85cb143fc096928366b062ed", lines: [kirkstone, scarthgap]}
+  "Artistic-1.0-Perl": {sha256: "9e18ef4d50faba562e3efa37d8961d6e9956d1c103bfc4fc1caeb07e8effe885", lines: [kirkstone, scarthgap]}
+  "Artistic-2.0": {sha256: "6fb8629227e22b914a1f5b892081fb2da55301df63013f90b720b6f0fbfe36b2", lines: [kirkstone, scarthgap]}
+  "Bahyph": {sha256: "d4b791741e3436c7ed335cd667f58ce06449a273cdff702039ba31b7d9f39e0c", lines: [kirkstone, scarthgap]}
+  "Barr": {sha256: "81fe1e987543218967099ed9e912d9ecbdd1148028b702665bc519e6bc70c82b", lines: [kirkstone, scarthgap]}
+  "Beerware": {sha256: "991d8a58e0b4be84a174a9bd333a8ca33807a0c1ce6d23a2e25a21f7ece482d0", lines: [kirkstone, scarthgap]}
+  "BitstreamVera": {sha256: "576a10ee3ed9b4ae400f93facf40af3b0cadb96b106520669150ba364d229e67", lines: [kirkstone, scarthgap]}
+  "BitTorrent-1.0": {sha256: "cdc899a2347d6ca02027726202a69d3252edce26ea021b6d580235a9e87c7e58", lines: [kirkstone, scarthgap]}
+  "BitTorrent-1.1": {sha256: "69217aa11fdf55964628adbb1cfddec81d70d81343047ba00a509b34b7678742", lines: [kirkstone, scarthgap]}
+  "blessing": {sha256: "592db1199aab67aafe4515db9808b420db122083807c5329b2f061951e79acbe", lines: [kirkstone, scarthgap]}
+  "BlueOak-1.0.0": {sha256: "8a1af140fdfbf5afd3df27f7e662f989c5b963a300020dfafce42033cae9e004", lines: [kirkstone, scarthgap]}
+  "Borceux": {sha256: "aa0f864b15e20c58b552928cc65e4266d8630f47f4136be00c98f9ceda7b6eb6", lines: [kirkstone, scarthgap]}
+  "BSD-1-Clause": {sha256: "ce785d9ce36d55fa6c8bb0a57bbc9f2a048610f21253c061679db910e06e1d3a", lines: [kirkstone, scarthgap]}
+  "BSD-2-Clause": {sha256: "fc3fb026df9adaab79cf1945eacfa3776d670dd83793969adcf8fe446cb15d01", lines: [kirkstone, scarthgap]}
+  "BSD-2-Clause-Patent": {sha256: "4e96c1f9adcfb51e2435058e75a3587e9d85b5cb3aa9d0db6b8440b23adb5abe", lines: [kirkstone, scarthgap]}
+  "BSD-2-Clause-Views": {sha256: "cf2d8e08c5c338804d361fee703f88f52b7fdc710eab87ccd072cf083696f6fc", lines: [kirkstone, scarthgap]}
+  "BSD-3-Clause": {sha256: "4c306515351b3cc8a938f280299d652f9f248d6dc364a5ad1bfe98172f1a5918", lines: [kirkstone, scarthgap]}
+  "BSD-3-Clause-Attribution": {sha256: "088b09c3bff4d190ca86eb8742ca494af321e3abd309c1c9ad9ccdd86dc5b3ef", lines: [kirkstone, scarthgap]}
+  "BSD-3-Clause-Clear": {sha256: "35a0afeee5d17d937f70350dede2847708598af0731e11dca7ba03fff402bc43", lines: [kirkstone, scarthgap]}
+  "BSD-3-Clause-LBNL": {sha256: "49d63fdb269af8c5209eb1dee7f6d21d7e790785a8774ca8928ddb1ca47ce2c7", lines: [kirkstone, scarthgap]}
+  "BSD-3-Clause-Modification": {sha256: "c9d6ed9e3618b2caf1e26d863a9469baf20e7ad39a6804a200b3ccd8710b335e", lines: [kirkstone, scarthgap]}
+  "BSD-3-Clause-No-Military-License": {sha256: "41e603d9270a99621857db0b3e6b2d7fecfbe4f6cd002e505fe635c2f69e2a3d", lines: [kirkstone, scarthgap]}
+  "BSD-3-Clause-No-Nuclear-License": {sha256: "54493541a36e52787ebd104f994172a4ab474ce6aff622e377457d816ca44ef3", lines: [kirkstone, scarthgap]}
+  "BSD-3-Clause-No-Nuclear-License-2014": {sha256: "a48cc8968eb873ed6c8facde24e3fe3145fd09c45cbac37ba20ab59e5e44536b", lines: [kirkstone, scarthgap]}
+  "BSD-3-Clause-No-Nuclear-Warranty": {sha256: "d3ce9bbc979d0eddb9006621ed5bd8f127af1054de064d438dd21a2c23d8bfdd", lines: [kirkstone, scarthgap]}
+  "BSD-3-Clause-Open-MPI": {sha256: "a4bd3317cea75d614ac192803a60d6f54dd15a28ea509576d4932778e2879a98", lines: [kirkstone, scarthgap]}
+  "BSD-4-Clause": {sha256: "3d82bbf4479c38d64f670d9370709fb691341411d57dc38276f6bf71781fb709", lines: [kirkstone, scarthgap]}
+  "BSD-4-Clause-Shortened": {sha256: "0006343c63f49f803c08b0cf3e918a4fbcd4bef17f3c61ad704aae3474c2472b", lines: [kirkstone, scarthgap]}
+  "BSD-4-Clause-UC": {sha256: "c82a5eb55679a3fd483d992c2428e66ee4b9b05b5b78b4ac916692368955b526", lines: [kirkstone, scarthgap]}
+  "BSD-Protection": {sha256: "42277c58c0373c9c2ce0cd349d8e7f8da793933806b22591c63ff0bc73841a00", lines: [kirkstone, scarthgap]}
+  "BSD-Source-Code": {sha256: "1f1b677d26ab73e159a55c3a914cf12d888e18a9d0d469fedab4aa6e5a48b1c0", lines: [kirkstone, scarthgap]}
+  "BSL-1.0": {sha256: "036a324cd6ece33cc52d5475eae6b3b47d416aee4a02be95d9734cced9722f14", lines: [kirkstone, scarthgap]}
+  "BUSL-1.1": {sha256: "e57ecd999511f4515a1d06dd775700762576af914bf3101a8d2330b50ca42e05", lines: [kirkstone, scarthgap]}
+  "bzip2-1.0.4": {sha256: "9491498bec823e515e401edad444db14c48fee32d64a5c5be9c1e3f3357921d6", lines: [kirkstone, scarthgap]}
+  "bzip2-1.0.5": {sha256: "96b2cb9b836969603a820faf06f8e28b0b46809692b791793df291b658540db7", lines: [kirkstone, scarthgap]}
+  "bzip2-1.0.6": {sha256: "a04a013cbbb1ff794c0bdf77af4cef040e67583f75bc6cf6d44dda692db7c7a0", lines: [kirkstone, scarthgap]}
+  "C-UDA-1.0": {sha256: "010e48b7389abc09621b16c332d3e7d138ce0815bff07e67a5cb05ef5407058f", lines: [kirkstone, scarthgap]}
+  "CAL-1.0": {sha256: "a24987ff96bf2e331cb7d90989fba6d7f90a37e07ac1b99927025c3fb4a5df36", lines: [kirkstone, scarthgap]}
+  "CAL-1.0-Combined-Work-Exception": {sha256: "a24987ff96bf2e331cb7d90989fba6d7f90a37e07ac1b99927025c3fb4a5df36", lines: [kirkstone, scarthgap]}
+  "Caldera": {sha256: "fc237785d2ebe63d4ff8e52b3ece122afdadacbc187b5d092fc37042d6065c61", lines: [kirkstone, scarthgap]}
+  "CATOSL-1.1": {sha256: "59da6cb3f1a348749db40ea590de38feb3a12172d7882b970cc6e543dc147958", lines: [kirkstone, scarthgap]}
+  "CC-BY-1.0": {sha256: "3799df2f63595a54f2271ec05cf0f271ef9dc6ad7b58c0a7609211b98359cbf2", lines: [kirkstone, scarthgap]}
+  "CC-BY-2.0": {sha256: "fc87c7a7fb340b0a235e70d8485306fa082912f03477f4a25540288d1d68c044", lines: [kirkstone, scarthgap]}
+  "CC-BY-2.5": {sha256: "b9f975f8241168645a52f7669d5dfe71d9c46c42bb3faa0d5624f282c25f3a80", lines: [kirkstone, scarthgap]}
+  "CC-BY-2.5-AU": {sha256: "0e035b0af59631c22efc3cd4e914b8eff3901ecfdb955a665a5f418aa71f9cd0", lines: [kirkstone, scarthgap]}
+  "CC-BY-3.0": {sha256: "9580dbbbb2047f66ca5e62bd372d3426175f84603ca9070486e6b6dab665cd25", lines: [kirkstone, scarthgap]}
+  "CC-BY-3.0-AT": {sha256: "445ceca0d524644d683235522f139781b1d7810f7a90b09de1357bc2117025ea", lines: [kirkstone, scarthgap]}
+  "CC-BY-3.0-DE": {sha256: "131f3a68b3fc2fb59c77615e5ab7b6876f84efa33c3108d23e6db0e2ea9fdae1", lines: [kirkstone, scarthgap]}
+  "CC-BY-3.0-NL": {sha256: "aacbc3e84cc7000ff659c8564f29ab070a02662758c78e9ea601919e1d25a6c2", lines: [kirkstone, scarthgap]}
+  "CC-BY-3.0-US": {sha256: "df36d89de58066f49fa9b81f4290ea409adbbdd9d69c620359efbdc8bccaac3c", lines: [kirkstone, scarthgap]}
+  "CC-BY-4.0": {sha256: "d557539df68e771cc1eedcc91d13f70fca930e508d11eedcafa4b15db49e3744", lines: [kirkstone, scarthgap]}
+  "CC-BY-NC-1.0": {sha256: "0c4c86dbf236b59279952d376d104622aa3dd0965e8fa76f15278dfe91fb42be", lines: [kirkstone, scarthgap]}
+  "CC-BY-NC-2.0": {sha256: "946adf14d56e147a46ec5efcbd89eb50e0aaa4addfb2da7d8246d37124a724d2", lines: [kirkstone, scarthgap]}
+  "CC-BY-NC-2.5": {sha256: "e702962e6e94d59bbf97d759425ccb0189c24c66900f053e3028fdfebb09448b", lines: [kirkstone, scarthgap]}
+  "CC-BY-NC-3.0": {sha256: "63ae0f1faa78479cf278d852cce18fa0131a038751d4fcb0fd283cdcd6997886", lines: [kirkstone, scarthgap]}
+  "CC-BY-NC-3.0-DE": {sha256: "bdc3d2bf54dfe572f0f8c6134e0ed3bbfceed89623777fa2b61b7af4ddb0164e", lines: [kirkstone, scarthgap]}
+  "CC-BY-NC-4.0": {sha256: "cc97a2c4ff7723a1f25179dc7c18f676fa84191bbb36ea7d0061acaf3c102559", lines: [kirkstone, scarthgap]}
+  "CC-BY-NC-ND-1.0": {sha256: "84c480f06f738b6f3a9c745af74719384d73e71ed79ea9104deb52f4359e5bb5", lines: [kirkstone, scarthgap]}
+  "CC-BY-NC-ND-2.0": {sha256: "32623d676e64f3c5cc14bbcce604e47f66750722c1a141970d0843c3afc0737b", lines: [kirkstone, scarthgap]}
+  "CC-BY-NC-ND-2.5": {sha256: "717ac1d6bb2f2fd9f380667f202ce121ba0c43564643b4697821234d54507460", lines: [kirkstone, scarthgap]}
+  "CC-BY-NC-ND-3.0": {sha256: "58701101f0fb1c21542505ea34b959235870e0a1e17fae2e562aa6ea5f81e563", lines: [kirkstone, scarthgap]}
+  "CC-BY-NC-ND-3.0-DE": {sha256: "4278b50eadabfdf513c8f4b671e366d7bba295b30bdcaaa2c489fde93239ea8b", lines: [kirkstone, scarthgap]}
+  "CC-BY-NC-ND-3.0-IGO": {sha256: "3519844fc261aaffd6e93beb29a0e37373d8c6116968264b1e67d310fe79cdfe", lines: [kirkstone, scarthgap]}
+  "CC-BY-NC-ND-4.0": {sha256: "4f3c4a321eb0c73182eee7afa3fe0111e24dec193f2d6febcf4207f26af26839", lines: [kirkstone, scarthgap]}
+  "CC-BY-NC-SA-1.0": {sha256: "5ad6e9f0ddf2e24d8e07a85bf532c662e819f4f650f989f851ed5ca5cefe848f", lines: [kirkstone, scarthgap]}
+  "CC-BY-NC-SA-2.0": {sha256: "8d9197c666fc90534c446de1850a38565fe5e2b377d17f43af041f9b2ab801cd", lines: [kirkstone, scarthgap]}
+  "CC-BY-NC-SA-2.0-FR": {sha256: "0167ea1c1e7cbe892b94ce3188ee5ddda602a6c602ca173876220fa852bf5ccc", lines: [kirkstone, scarthgap]}
+  "CC-BY-NC-SA-2.0-UK": {sha256: "42ef58839f2a106619788b869467bba338e95ebc77a56fca4ad9c11ac619e161", lines: [kirkstone, scarthgap]}
+  "CC-BY-NC-SA-2.5": {sha256: "78c7ba134e4fbf8b984927203d5c878ad4b201a09d93dbcd5e40bf03843af68a", lines: [kirkstone, scarthgap]}
+  "CC-BY-NC-SA-3.0": {sha256: "4be1bebb993898d7c1d131839e2330faae3e70cde5b4404ebf9982d77d20b492", lines: [kirkstone, scarthgap]}
+  "CC-BY-NC-SA-3.0-DE": {sha256: "586f029f79ee442db87f5f9e4d6b38e0f000f38eb0c118eac3526bf3ce3f0568", lines: [kirkstone, scarthgap]}
+  "CC-BY-NC-SA-3.0-IGO": {sha256: "493d06d0942a099c3510bbf03b1c7968d24e7c87f4c9eab2e3913d943c4e4c92", lines: [kirkstone, scarthgap]}
+  "CC-BY-NC-SA-4.0": {sha256: "600ca4e25fe11762b75a97e714707fab48bb778374e92d24c6ca068791661c11", lines: [kirkstone, scarthgap]}
+  "CC-BY-ND-1.0": {sha256: "5be71498532c9de726ee44a866618935259473aa9afd5ff32c0ac82afa5cff3f", lines: [kirkstone, scarthgap]}
+  "CC-BY-ND-2.0": {sha256: "3e689655db6a44518cba55c77d13954b12cab5eab4ab44b9bbc22f474fca8a2d", lines: [kirkstone, scarthgap]}
+  "CC-BY-ND-2.5": {sha256: "03cc9c475da71bba78a433ef3c6ca45f54916f61523836ea72008b91586313d8", lines: [kirkstone, scarthgap]}
+  "CC-BY-ND-3.0": {sha256: "411d21f1dc03008215a1fda10d9e728daebee1c1b3426435cbd28fb1cf3170e3", lines: [kirkstone, scarthgap]}
+  "CC-BY-ND-3.0-DE": {sha256: "7132884903d19675110caa4d1ef6f77efb2126a3027fe07069d373792e709ded", lines: [kirkstone, scarthgap]}
+  "CC-BY-ND-4.0": {sha256: "4a9d465e981ae6bde7f117abbfb0e24f2cc1820e99a47efbe58593fa5c43fa29", lines: [kirkstone, scarthgap]}
+  "CC-BY-SA-1.0": {sha256: "520adea84e7b8e930c0ab2e2256751a4e6b421a1f8e8514a72cc1d02c2315ef4", lines: [kirkstone, scarthgap]}
+  "CC-BY-SA-2.0": {sha256: "4181eed990bbd370540d7d90696597dc3050b5df59a1c14915a3e0b96f9109b5", lines: [kirkstone, scarthgap]}
+  "CC-BY-SA-2.0-UK": {sha256: "794bc0365e8b31fa70d4041ec7166b398a587c5ca95209dd1ac1d69f7a8c1fb9", lines: [kirkstone, scarthgap]}
+  "CC-BY-SA-2.1-JP": {sha256: "3149d336715b0a15e7dbc6454efd13a363ceab2e60c15264cb48252da0b03736", lines: [kirkstone, scarthgap]}
+  "CC-BY-SA-2.5": {sha256: "7fa351c0ee0dae3ec403854b0ee3eb22a4fb3ae33471c65c8fc10669b7c939d5", lines: [kirkstone, scarthgap]}
+  "CC-BY-SA-3.0": {sha256: "ac159cd6d96acc94bc8efc11e9306e73d63fba1586f20cd7c7aea550534e7d91", lines: [kirkstone, scarthgap]}
+  "CC-BY-SA-3.0-AT": {sha256: "81184828fbd0059bbb5216306a3b03dd268e16c3bfb2470ddb269e1deda323a8", lines: [kirkstone, scarthgap]}
+  "CC-BY-SA-3.0-DE": {sha256: "890b6b8f3d048633eb95c91c05d09f8e6a7e9e740b84d375ecc4601e7d3a83c1", lines: [kirkstone, scarthgap]}
+  "CC-BY-SA-4.0": {sha256: "6d4e2239c9605f95e1031309e8bd156dec62c55817427655003c57baceafb1e2", lines: [kirkstone, scarthgap]}
+  "CC-PDDC": {sha256: "40f05ccacf018e7311690cd03bba659a1329b3df9775d2aafd33715d52541fe0", lines: [kirkstone, scarthgap]}
+  "CC0-1.0": {sha256: "0558101984550fa84d1d13c2af11d116c20079d2be58711e8d99cadce7009192", lines: [kirkstone, scarthgap]}
+  "CDDL-1.0": {sha256: "e7c245898de4f00c451b5637fd8e967970ace9f42910f906ffcbc4d89bcd4089", lines: [kirkstone, scarthgap]}
+  "CDDL-1.1": {sha256: "b5bbb5ac38b5cb76862a7f410ca567e4b32d7c22f22622ebff10ba434827bb78", lines: [kirkstone, scarthgap]}
+  "CDL-1.0": {sha256: "8ca6d06e4e0e8ee6397ec94aaebd6fb3d6537237a7b1fa1efc676bef957e0325", lines: [kirkstone, scarthgap]}
+  "CDLA-Permissive-1.0": {sha256: "52aa39b7c72a3712b1e1ab0b2d6b9d790f443f985407672b9df8edab9eb64712", lines: [kirkstone, scarthgap]}
+  "CDLA-Permissive-2.0": {sha256: "4531a67d443284d93ffed0803df5b10634aff21c3d77e381f2d48af01d875868", lines: [kirkstone, scarthgap]}
+  "CDLA-Sharing-1.0": {sha256: "6419d7a7245cb8a9da6e3dd925d05d824ea0268e3527095f68dec091f84f75da", lines: [kirkstone, scarthgap]}
+  "CECILL-1.0": {sha256: "703a50beefa7e6d2dbcee8fda506032cb80b5de8ef5fe2098a3c32be98fe4057", lines: [kirkstone, scarthgap]}
+  "CECILL-1.1": {sha256: "f6e7067cb4f0ce195cc66767bad5f527aec66be5e29142c9fad984efb7aadc73", lines: [kirkstone, scarthgap]}
+  "CECILL-2.0": {sha256: "2c17b3dcbfee1d84895b2f46e07d20666e4042e5fc960a57d4f135c7af3db68e", lines: [kirkstone, scarthgap]}
+  "CECILL-2.1": {sha256: "4ea234937bc7b0aa5247e436690d1eb9324875bc7590ecde50befd38e35190a5", lines: [kirkstone, scarthgap]}
+  "CECILL-B": {sha256: "bbdfd68414d2810bb403763699b5bee1cc5630e629125a3593b88bb3348fbb8e", lines: [kirkstone, scarthgap]}
+  "CECILL-C": {sha256: "bcdc0726425801ef784a341da43b11d0b52513377e991d1be92c4a57e4b05782", lines: [kirkstone, scarthgap]}
+  "CERN-OHL-1.1": {sha256: "6d1ef4fa73531fc09cb7e8dbe6d0f11dee648d3d219182f33bfd8eec9dc15f8f", lines: [kirkstone, scarthgap]}
+  "CERN-OHL-1.2": {sha256: "23c2c8424e73eb3a052df1460317f45931c16f3df251add6bbd8401f98ec4b85", lines: [kirkstone, scarthgap]}
+  "CERN-OHL-P-2.0": {sha256: "eeecc593866fa1c3b80189c7e3dc0ceb77740557fa92f81771f891cc54c579cb", lines: [kirkstone, scarthgap]}
+  "CERN-OHL-S-2.0": {sha256: "d6475a84171f0cf7ff52667dea714df268fc65cea42f0bf328b0b70d4cd0ebab", lines: [kirkstone, scarthgap]}
+  "CERN-OHL-W-2.0": {sha256: "c1432111d0aeefc9d1ced8105d2d4ed07d5dcb1fd43abb5d4616c4f9ef96e08f", lines: [kirkstone, scarthgap]}
+  "ClArtistic": {sha256: "34c6ab93eaef9541b00f1137e24b4a8d427771b8bf7a3310a037e6a0f8e05fb8", lines: [kirkstone, scarthgap]}
+  "CNRI-Jython": {sha256: "a2acd6ddc03c0afe980da1ebebe5beb8b120026518f096d6a9c9d007d17ee5f7", lines: [kirkstone, scarthgap]}
+  "CNRI-Python": {sha256: "69b5d7d41a6ece3b20c6a77774f567948766d8643f7646e3f65474692cce5c15", lines: [kirkstone, scarthgap]}
+  "CNRI-Python-GPL-Compatible": {sha256: "8e1f50d9b3c33a6a58559a27042475a6267c7ebc745be85f2eaa2ffb04878dc8", lines: [kirkstone, scarthgap]}
+  "Condor-1.1": {sha256: "476d61c785ea5f58d5f4978f432b7d996881af1191c49fe79e50bd9983591762", lines: [kirkstone, scarthgap]}
+  "copyleft-next-0.3.0": {sha256: "fb1e982dc26f539d1ba48ab2e7ba16e9d573fa9e4cdca3a36c47ceb2b42f8cb1", lines: [kirkstone, scarthgap]}
+  "copyleft-next-0.3.1": {sha256: "ef241a58203ce1474141d3b014ff59d5a22b31248263e8dd78f7b5ff367e97bb", lines: [kirkstone, scarthgap]}
+  "CPAL-1.0": {sha256: "97c258f0083e4b3fc6c15e0fae04380337e219bd14ec7314639ed2c89c83aed5", lines: [kirkstone, scarthgap]}
+  "CPL-1.0": {sha256: "c31c34f850aafdb2c4e1076f66edb5c1af3d10c759268f03d5ffa0257f037e89", lines: [kirkstone, scarthgap]}
+  "CPOL-1.02": {sha256: "d69c13067c9fdf52f2b4d9e26478c30821abd7d96bd31968eae78c829f9b1e64", lines: [kirkstone, scarthgap]}
+  "Crossword": {sha256: "6c4739fc77cefada295bb7705af468ddbaa4ad98e79f30ee11f7b9ed506f9890", lines: [kirkstone, scarthgap]}
+  "CrystalStacker": {sha256: "2fab343deeb18d20ff0e23388a88a6c1505077c27a4ef49cbd189dbc90d5279e", lines: [kirkstone, scarthgap]}
+  "CUA-OPL-1.0": {sha256: "3228f77885e7c18e96069fe36afe39eaa0cfae108352a2029081284dae0549c8", lines: [kirkstone, scarthgap]}
+  "Cube": {sha256: "eefb4a0ba74f94ab9fbf57c4391cddc914cc86248c788c0581497c93088788c9", lines: [kirkstone, scarthgap]}
+  "curl": {sha256: "272d1239bdcef73bb98bac206168ca1040bd4a31296755fadfb7515bcea18df3", lines: [kirkstone, scarthgap]}
+  "D-FSL-1.0": {sha256: "d3b9533606523db32fc7d91c47ec04187452d2b6fbda6dbe9fbd50e89652641f", lines: [kirkstone, scarthgap]}
+  "diffmark": {sha256: "44c1eae63a550696742e0896b6122bd65bdbeace0d9ad64d24a3fb05100563e3", lines: [kirkstone, scarthgap]}
+  "DOC": {sha256: "de40eb797e5b9225c42d93b157a0d6f0ea5367f950adb1ed731652284207a67d", lines: [kirkstone, scarthgap]}
+  "Dotseqn": {sha256: "173bc5170b7f83a138f8b0cbc30530cbb09273e6ef608d072cdd180e26cb1f1d", lines: [kirkstone, scarthgap]}
+  "DRL-1.0": {sha256: "8c3b3b2f84a0d9d4d0a24f358c4515a84676bdc802d2965327d385745b321de3", lines: [kirkstone, scarthgap]}
+  "DSDP": {sha256: "796f94844f13d4cce27e4d71e1a2782e7b6a69f31d1c88956e4d24a556533998", lines: [kirkstone, scarthgap]}
+  "DSSSL": {sha256: "644fb22f6722a2bce337ab50880e4d92383b1abcf970356850fc5945d1e60036", lines: [kirkstone, scarthgap]}
+  "dvipdfm": {sha256: "b80c6a40accb70f26e04d26d47db8d9a885796b47ae6d027256fc1d4b7004d4e", lines: [kirkstone, scarthgap]}
+  "ECL-1.0": {sha256: "35f7554dd80af86c7810491f285d0f709ad8fa45a7d95bbcb44193572b7e794a", lines: [kirkstone, scarthgap]}
+  "ECL-2.0": {sha256: "3378daf0ef08324a3b52fe05eccedbd4bd5761191ec85da03f2867b5220c83e6", lines: [kirkstone, scarthgap]}
+  "eCos-2.0": {sha256: "4e636cb5e75c05fb10f2ec2d8a151da9408214bceeb5317fb6d63634a7b4873d", lines: [kirkstone, scarthgap]}
+  "EDL-1.0": {sha256: "34b4674e457e0b0ecdec224e6a47b68eedcd489678fbff0719ee74fa00a84691", lines: [kirkstone, scarthgap]}
+  "EFL-1.0": {sha256: "805c6c972e7e692903771caf1e426b31aded144d39bbf9ab8a63bdecea6752d6", lines: [kirkstone, scarthgap]}
+  "EFL-2.0": {sha256: "49363ccbd233ef8cdfc5017269e4334e5532a50c3a4dd7d700da36d86fb4bedd", lines: [kirkstone, scarthgap]}
+  "eGenix": {sha256: "fc27d513401d457ae1d259f8714f9deed874aa35d733ed719a9f4248fb5e3e68", lines: [kirkstone, scarthgap]}
+  "Entessa": {sha256: "54598d68c334592dc2fedcac9a82152649bea901fafacd40e1643c7d4dc556e0", lines: [kirkstone, scarthgap]}
+  "EPICS": {sha256: "89235e921d859ba6130b584a6ec0ced3151167623207fc03ce95513adad009c9", lines: [kirkstone, scarthgap]}
+  "EPL-1.0": {sha256: "e242cdcc87b7be1334687d132851ec9fbad00ae7b1ab2d2ad7b5187e7261de02", lines: [kirkstone, scarthgap]}
+  "EPL-2.0": {sha256: "8c349f80764d0648e645f41ef23772a70c995a0924b5235f735f4a3d09df127c", lines: [kirkstone, scarthgap]}
+  "ErlPL-1.1": {sha256: "8ebf3de71e94db8c7e9afb68877a16c121ef75a22a169e0ffee76fae58e9ab15", lines: [kirkstone, scarthgap]}
+  "etalab-2.0": {sha256: "f82596bde5c4abc62b4e63b1a3ba555f6b9203a340765fb178d188958600d111", lines: [kirkstone, scarthgap]}
+  "EUDatagrid": {sha256: "7c648edf1620ca06c6b4085b7960f3d081c26ac1fe0158017d557eb4a721937e", lines: [kirkstone, scarthgap]}
+  "EUPL-1.0": {sha256: "d51c284d33ac4df597db0849e761e9937250e29635295de679f55b57cb46f8ec", lines: [kirkstone, scarthgap]}
+  "EUPL-1.1": {sha256: "a11c8c90025efb19d1dc69f0da1905bf387637be330fcd716c42bc75da4b7e8a", lines: [kirkstone, scarthgap]}
+  "EUPL-1.2": {sha256: "57fb42fbcd0b037ce528ed8f72f1ec095d67bc6825ecf1448ff39be1fe68a4b4", lines: [kirkstone, scarthgap]}
+  "Eurosym": {sha256: "d637da895576888c3b9c31e416bfe4039b3273eda95f6295e046a26aef1c9cf8", lines: [kirkstone, scarthgap]}
+  "Fair": {sha256: "f404fbae4c4641f8f4bad3dc3454be202d21314c827d25b51432dce4e844c295", lines: [kirkstone, scarthgap]}
+  "Frameworx-1.0": {sha256: "1a13b094d451e927db3be9f8f7c148e082085e00d71fbaee224b2d18bf8eaeb1", lines: [kirkstone, scarthgap]}
+  "FreeBSD-DOC": {sha256: "5f8b56ac9004a40244eba78f9db2661c7e0c22b864dce6d6a6fd036ecf1a4c6f", lines: [kirkstone, scarthgap]}
+  "FreeImage": {sha256: "eb3a4cb8220bb3cfcb1fde4b07f39481afd93bc7c9eabafdcf06292611ca9b70", lines: [kirkstone, scarthgap]}
+  "FSF-Unlimited": {sha256: "dc2d55ddec826cd1339ad1bc4e14fc3e28407373f56b7404dda22ee6d02d0edf", lines: [kirkstone, scarthgap]}
+  "FSFAP": {sha256: "99cb91dacd5714a701749ec47239015726beec5fc86a5c94a4873778824b16d7", lines: [kirkstone, scarthgap]}
+  "FSFUL": {sha256: "a5e99f55b10212abd954f092b65ef5d4cf4047071fe20be307406a148a342c35", lines: [kirkstone, scarthgap]}
+  "FSFULLR": {sha256: "6d425c2caac889c969c8c2ebb18b1e2326f0d8c7f82e43c0e6c9c957fe3c6cd0", lines: [kirkstone, scarthgap]}
+  "FTL": {sha256: "ced6622122ce451cb1ea0c3c3f507a640e2a44c075c04900ddd9fae8acb5369f", lines: [kirkstone, scarthgap]}
+  "GD": {sha256: "5294cfc75f9d13209ae8c88ecda14e255d4ce8b27f282e924d33f7e7845ed8d7", lines: [kirkstone, scarthgap]}
+  "GFDL-1.1": {sha256: "40933c196ad9b965f8e347022d05034012c6857219e570fb2912b061d4cdcfd2", lines: [kirkstone, scarthgap]}
+  "GFDL-1.1-invariants-only": {sha256: "25fa19cb49d292047f3f16879301ae3a496b263a938f74e1840906d97f6d0211", lines: [kirkstone, scarthgap]}
+  "GFDL-1.1-invariants-or-later": {sha256: "25fa19cb49d292047f3f16879301ae3a496b263a938f74e1840906d97f6d0211", lines: [kirkstone, scarthgap]}
+  "GFDL-1.1-no-invariants-only": {sha256: "25fa19cb49d292047f3f16879301ae3a496b263a938f74e1840906d97f6d0211", lines: [kirkstone, scarthgap]}
+  "GFDL-1.1-no-invariants-or-later": {sha256: "25fa19cb49d292047f3f16879301ae3a496b263a938f74e1840906d97f6d0211", lines: [kirkstone, scarthgap]}
+  "GFDL-1.1-only": {sha256: "25fa19cb49d292047f3f16879301ae3a496b263a938f74e1840906d97f6d0211", lines: [kirkstone, scarthgap]}
+  "GFDL-1.1-or-later": {sha256: "25fa19cb49d292047f3f16879301ae3a496b263a938f74e1840906d97f6d0211", lines: [kirkstone, scarthgap]}
+  "GFDL-1.2": {sha256: "5e8e880c14e762dc3dc33f324e7bd72ec3bcb86c0ab5ea15c99c7e2dff802f71", lines: [kirkstone, scarthgap]}
+  "GFDL-1.2-invariants-only": {sha256: "1118a91a3290bc8981f922dfcffc1a619592c007aa31b7a98cee694d933c86ce", lines: [kirkstone, scarthgap]}
+  "GFDL-1.2-invariants-or-later": {sha256: "1118a91a3290bc8981f922dfcffc1a619592c007aa31b7a98cee694d933c86ce", lines: [kirkstone, scarthgap]}
+  "GFDL-1.2-no-invariants-only": {sha256: "1118a91a3290bc8981f922dfcffc1a619592c007aa31b7a98cee694d933c86ce", lines: [kirkstone, scarthgap]}
+  "GFDL-1.2-no-invariants-or-later": {sha256: "1118a91a3290bc8981f922dfcffc1a619592c007aa31b7a98cee694d933c86ce", lines: [kirkstone, scarthgap]}
+  "GFDL-1.2-only": {sha256: "1118a91a3290bc8981f922dfcffc1a619592c007aa31b7a98cee694d933c86ce", lines: [kirkstone, scarthgap]}
+  "GFDL-1.2-or-later": {sha256: "1118a91a3290bc8981f922dfcffc1a619592c007aa31b7a98cee694d933c86ce", lines: [kirkstone, scarthgap]}
+  "GFDL-1.3": {sha256: "c335eab5dd1efdc9bdfd360494964591c377a71883561df40c212aec7c082831", lines: [kirkstone, scarthgap]}
+  "GFDL-1.3-invariants-only": {sha256: "d024962f1f4966c102b40d9fd9cc834a3f0b3c1397b41444b7cd7925640dc929", lines: [kirkstone, scarthgap]}
+  "GFDL-1.3-invariants-or-later": {sha256: "d024962f1f4966c102b40d9fd9cc834a3f0b3c1397b41444b7cd7925640dc929", lines: [kirkstone, scarthgap]}
+  "GFDL-1.3-no-invariants-only": {sha256: "d024962f1f4966c102b40d9fd9cc834a3f0b3c1397b41444b7cd7925640dc929", lines: [kirkstone, scarthgap]}
+  "GFDL-1.3-no-invariants-or-later": {sha256: "d024962f1f4966c102b40d9fd9cc834a3f0b3c1397b41444b7cd7925640dc929", lines: [kirkstone, scarthgap]}
+  "GFDL-1.3-only": {sha256: "d024962f1f4966c102b40d9fd9cc834a3f0b3c1397b41444b7cd7925640dc929", lines: [kirkstone, scarthgap]}
+  "GFDL-1.3-or-later": {sha256: "d024962f1f4966c102b40d9fd9cc834a3f0b3c1397b41444b7cd7925640dc929", lines: [kirkstone, scarthgap]}
+  "Giftware": {sha256: "ea1f4b4145e906a6a6a0fb2288dd6362f175f58c69a24b598092fc53d74fc96e", lines: [kirkstone, scarthgap]}
+  "GL2PS": {sha256: "58c616ccc0034975b82c0ae8d0dab9e7704ee1be5e670be7b81a762cc98c2346", lines: [kirkstone, scarthgap]}
+  "Glide": {sha256: "5eaa9ab5acc3e11f248e77eeb1c77d699064e1c3cad78a9e7db1bc4867a08ad6", lines: [kirkstone, scarthgap]}
+  "Glulxe": {sha256: "38df8b60705e5b622c66f431a11e5cfba9350e66ed0ae7eb529112699bfdc142", lines: [kirkstone, scarthgap]}
+  "GLWTPL": {sha256: "761baf8222655fcaed12b56fc70fa60ef822ad233663dd2f8088fba5bf07906a", lines: [kirkstone, scarthgap]}
+  "gnuplot": {sha256: "bf8f6d32101126a5994902c3b66d32c4cdbc1202abe13d6c4ac86d970e7c0a9e", lines: [kirkstone, scarthgap]}
+  "GPL-1.0-only": {sha256: "fa5a059d712f243d4d2b3b5474f4ea7eb4f8a948f4bd7b4c95769ec739efab0a", lines: [kirkstone, scarthgap]}
+  "GPL-1.0-or-later": {sha256: "0155ef252474a7e6dad095fc3d4018a44687131362e80b4bb8fb184d874456a3", lines: [kirkstone, scarthgap]}
+  "GPL-2-with-bison-exception": {sha256: "68d4e144bc1467a48f47e0dea48a7601eb0e949ba2690c07a72793337cda208d", lines: [kirkstone, scarthgap]}
+  "GPL-2.0-only": {sha256: "f89c8bdbf6eb77e64b5cc53233b446bca77f1d1dae576c81925970be5ecfc891", lines: [kirkstone, scarthgap]}
+  "GPL-2.0-or-later": {sha256: "606aa26338f69ce178f1cbc648b7574aec4b5bbaeb20f4df36ff49010cb8fbbd", lines: [kirkstone, scarthgap]}
+  "GPL-2.0-with-autoconf-exception": {sha256: "84faf3e0858f1fd66d1521af7f93e324db652e5774b62be791c5935dda15cac2", lines: [kirkstone, scarthgap]}
+  "GPL-2.0-with-classpath-exception": {sha256: "13034a4e11b234bdbc9ab677f20a854461ae9cb5a0cfa5ccf281ca15ebde8fbd", lines: [kirkstone, scarthgap]}
+  "GPL-2.0-with-font-exception": {sha256: "8dd61e5423138fa7fc5b930b210bbac07fc7c83a8899729cbd37a46447eb8537", lines: [kirkstone, scarthgap]}
+  "GPL-2.0-with-GCC-exception": {sha256: "fa532f7d71141ba159673fd2b0892c1c4e98ab148260f1bdac9055d8f8a5e9d3", lines: [kirkstone, scarthgap]}
+  "GPL-2.0-with-OpenSSL-exception": {sha256: "d01b0e3d515fc1af0597e333560eb5ea84470d5944a1ea665341b221a5f0dfa8", lines: [kirkstone, scarthgap]}
+  "GPL-3-with-bison-exception": {sha256: "a11b081c0f557054c74a453e44e538cf46a4d208dc64332f715d82229da27678", lines: [kirkstone, scarthgap]}
+  "GPL-3.0-only": {sha256: "dbf6e18f46317b01da69dfaefdedb707e8682eb4dc1b4916dc3213bcb73012f0", lines: [kirkstone, scarthgap]}
+  "GPL-3.0-or-later": {sha256: "2ca9503d76d1ffab14f599b4741382eec11face60ad1f0d7a41897809003a286", lines: [kirkstone, scarthgap]}
+  "GPL-3.0-with-autoconf-exception": {sha256: "2fc49a83aab6748f3af59f9a27b608fe05338b9f469223a09cab03bcc72aaed0", lines: [kirkstone, scarthgap]}
+  "GPL-3.0-with-GCC-exception": {sha256: "aebc687df61aabebfd89cf076e64adc747c05b2b8fa6efb00fcbb9c03c82e12e", lines: [kirkstone, scarthgap]}
+  "gSOAP-1": {sha256: "35d7eff35d421b6a9447dd04997d123bdaf934e5c2fecffd0a36a13f66e01b37", lines: [kirkstone, scarthgap]}
+  "gSOAP-1.3b": {sha256: "40ac3c290ec937533e22ac0d94961e12afafc9a39da4ea8dfe2d2ebae237f4a5", lines: [kirkstone, scarthgap]}
+  "HaskellReport": {sha256: "5d28692ce2562cd7e0eb0ed6f087f84e71663b14d319e0ebb2abc8f84f1e308f", lines: [kirkstone, scarthgap]}
+  "Hippocratic-2.1": {sha256: "e64f3c8d11dcff7bcbe739ae7b2d3ef755cd3dadf47273ad3cdebbda8a40f58a", lines: [kirkstone, scarthgap]}
+  "HPND": {sha256: "351fe557a53bd5df4f398d5aa21c2b4a1985ac214fb4349b73156f3537fd9130", lines: [kirkstone, scarthgap]}
+  "HPND-sell-variant": {sha256: "235abc578371bf9861e3d6eee0a9ad16228f9be18408e17fc569c6a98ba69d5f", lines: [kirkstone, scarthgap]}
+  "HTMLTIDY": {sha256: "2cffd83fc5d377d1390acd010caec134710aaf88baf06d40c4c82692a7d9d94f", lines: [kirkstone, scarthgap]}
+  "IBM-pibs": {sha256: "cebae52c93165f81bae82596d2b786024b914313e9069aa55fc2dff60bddfb79", lines: [kirkstone, scarthgap]}
+  "ICU": {sha256: "4484b9fe63ed78ecf297d980892e9bdb09a94bc642effadf26f5296f35bb3c07", lines: [kirkstone, scarthgap]}
+  "IJG": {sha256: "7658542977bfdced9e1059a6c934ce4281de76d103b831007b825917dc62511a", lines: [kirkstone, scarthgap]}
+  "ImageMagick": {sha256: "0559a7a7cf47eaf00332b60f8db520866cc09899eaceda5fb528a24c184626a6", lines: [kirkstone, scarthgap]}
+  "iMatix": {sha256: "b671c84dec7bc37711226b9db9da9a6cebaad6bd006df3d60f080706181820ac", lines: [kirkstone, scarthgap]}
+  "Imlib2": {sha256: "19d21c4402df7020d631511274d991393267fd56b59aa014c0be90becd7631e4", lines: [kirkstone, scarthgap]}
+  "Info-ZIP": {sha256: "fa0c6949eee13c4099a6d0f78f9f1d76c7320e71adfc066d1632837320703a08", lines: [kirkstone, scarthgap]}
+  "Intel": {sha256: "2dc5b449d1dec77032932de6d193fc1f26ac36d98626844700dbded72da7b4c9", lines: [kirkstone, scarthgap]}
+  "Intel-ACPI": {sha256: "438661edc91b5627914befe431a03535a2bcf175614cfdb26c7aa6bfbbb0cc03", lines: [kirkstone, scarthgap]}
+  "Interbase-1.0": {sha256: "f3a34d96829d93613b291b98cc01baeb65ae4b85b6d1ae35bc6b86ea1b037112", lines: [kirkstone, scarthgap]}
+  "IPA": {sha256: "3de70804e2549e6de020d02dbe48a62f54c06605853110ede4eedf69c60473c8", lines: [kirkstone, scarthgap]}
+  "IPL-1.0": {sha256: "74053c3fa07871e7216e1cfdf71a467986d6781e382dce3e24c91e25c104e167", lines: [kirkstone, scarthgap]}
+  "ISC": {sha256: "0d43da8a7bd6e60c9cf89b46c2d738572e042e0e8dbdf145bc4eb50c6b238c18", lines: [kirkstone, scarthgap]}
+  "JasPer-2.0": {sha256: "c9911ffd3e0d18770b1fcdba9fb7cc1ecf942cf924771440e35872c40ae9e3e4", lines: [kirkstone, scarthgap]}
+  "JPNIC": {sha256: "656bf1cb2fd290432c8728df087a71b5daf363c6fc4863992590f2567fd58930", lines: [kirkstone, scarthgap]}
+  "JSON": {sha256: "8f175cfd3fb4528377836d75a7e28829c997a12b356dbf5cd1c6c85b1f11e49f", lines: [kirkstone, scarthgap]}
+  "LAL-1.2": {sha256: "66451dc4b36e6dfcd1a1cd6db69106fd5b11e877331e4af8094519999983101a", lines: [kirkstone, scarthgap]}
+  "LAL-1.3": {sha256: "b6ca3a455ec3f5d116b5c069d26f5e6dec8b164e1af8a06ba31c4f65306219f5", lines: [kirkstone, scarthgap]}
+  "Latex2e": {sha256: "5d68e4a9f72d6c1845be14efba0883926d093ab1a8e3fce765b0bcd7c98b77ef", lines: [kirkstone, scarthgap]}
+  "Leptonica": {sha256: "74fbc283706af770c44448ec1c1fe27d44e03eabf4f6b6cb9ff62c5facdcc70d", lines: [kirkstone, scarthgap]}
+  "LGPL-2.0-only": {sha256: "c1530418e84d8f1e57f134746f021ba520c730811dc43cfcd51df2341e68e5a3", lines: [kirkstone, scarthgap]}
+  "LGPL-2.0-or-later": {sha256: "de588a8b1c41fe73ffe1201f9d12c718a988ed8e1302929625a6e7c2bced7461", lines: [kirkstone, scarthgap]}
+  "LGPL-2.1-only": {sha256: "041234c81fd6fe6c531ea1a886b9e740b9ee06759d1a910a14edbd06f4aa62c7", lines: [kirkstone, scarthgap]}
+  "LGPL-2.1-or-later": {sha256: "1ccf09bf2f598308df4bed9cd8e9657dc5cd0973d2800318f2e241486e2edf3f", lines: [kirkstone, scarthgap]}
+  "LGPL-3.0-only": {sha256: "2900c74f8dfa8054f809774bc210280d1bb4bbcbae7ab63f3659cb4b77f73d2e", lines: [kirkstone, scarthgap]}
+  "LGPL-3.0-or-later": {sha256: "476b03829862ab7e3ed920f87fad3de3c995f7dd93c26476eb40f0117de43fdc", lines: [kirkstone, scarthgap]}
+  "LGPL-3.0-with-zeromq-exception": {sha256: "83f32abe61ee58ffb1b007412c08415168c052501dbf56d7a47aaaac52b03ef6", lines: [kirkstone, scarthgap]}
+  "LGPLLR": {sha256: "089a0a0b01dd68e9f804355f76772a010c03d6c543a0a9664e24ef5255cc0b62", lines: [kirkstone, scarthgap]}
+  "Libpng": {sha256: "142da07fb4b0cceb861b2e69fe7e5b602f25ec7adc85b0a426133d9ee0d2e116", lines: [kirkstone, scarthgap]}
+  "libpng-2.0": {sha256: "8232f6aa4a06606e1abea065d1a34d4eed1b1cdc0c0ffdcb40980cf3c1716acd", lines: [kirkstone, scarthgap]}
+  "libselinux-1.0": {sha256: "86657b4c0fe868d7cbd977cb04c63b6c667e08fa51595a7bc846ad4bed8fc364", lines: [kirkstone, scarthgap]}
+  "libtiff": {sha256: "a6ecaa20c8c1b7a8215ed05e5f58764f821596e36d31acc05282c6154cf0dc44", lines: [kirkstone, scarthgap]}
+  "LiLiQ-P-1.1": {sha256: "e29a35c0a27e3072a69900bcf8c478de3dcf31acd7058ef23b249b0bf5501ddf", lines: [kirkstone, scarthgap]}
+  "LiLiQ-R-1.1": {sha256: "efc4ee7d7064ec8c6b3103db8f525222aa0105de173c1b1c8a488e19ffec4439", lines: [kirkstone, scarthgap]}
+  "LiLiQ-Rplus-1.1": {sha256: "a26dc35b0586cfd36cf8f854c731ea20552d916a1d9f43387aa6636ec371838f", lines: [kirkstone, scarthgap]}
+  "Linux-OpenIB": {sha256: "6503d0418051ea29997c4c4d950386fcc356c9459a73a62d5d67707d04739b92", lines: [kirkstone, scarthgap]}
+  "LPL-1.0": {sha256: "84110c251f5fda9b4f91eb38164891b6cee6b1f9a64efdcc71b4f8c062150296", lines: [kirkstone, scarthgap]}
+  "LPL-1.02": {sha256: "7d1fee06f345ab6475e31bd9ff37ddab90d1d1bd9732aa7db6ce45a7277600c4", lines: [kirkstone, scarthgap]}
+  "LPPL-1.0": {sha256: "4f2991c42cd6e405949fa451bb2b27068e8cad739e425583b8f54cd19f8f2f7b", lines: [kirkstone, scarthgap]}
+  "LPPL-1.1": {sha256: "c0025505eb2d7c83e05fa2707e9a916dbd543536a79d236fb3d08760bf9a87bf", lines: [kirkstone, scarthgap]}
+  "LPPL-1.2": {sha256: "545d8ae8bc51c39add57c6dff0b080ac5659cb931b3146869a49ccc5c27f4f4a", lines: [kirkstone, scarthgap]}
+  "LPPL-1.3a": {sha256: "d1d977d5a7f0dd55e800a1827f6eb0241da6e0c32cbb7d66b8feae98834bf003", lines: [kirkstone, scarthgap]}
+  "LPPL-1.3c": {sha256: "59deac47ac4d8e94c5ecd1e70d11d5dc01644835465f67afd69021ed6bedbd6e", lines: [kirkstone, scarthgap]}
+  "MakeIndex": {sha256: "d0e7ed2b5cb9423dfd990e6559416babaf82a08b238f97c3298b2b9475af0531", lines: [kirkstone, scarthgap]}
+  "MirOS": {sha256: "bae11ba2f017e4eb325a04f473b19a15d0f9e51d2b86eb06c7d91599577b81b1", lines: [kirkstone, scarthgap]}
+  "MIT": {sha256: "58219de633379c957416007bf83bb7fa450b800a47ed8646f954a89177e3ece4", lines: [kirkstone, scarthgap]}
+  "MIT-0": {sha256: "59746d6285ffa44bfc7ecada352aa5d6a20dc8eab418a60ce091cc739012c135", lines: [kirkstone, scarthgap]}
+  "MIT-advertising": {sha256: "9c81f1a97e353c75c4eb5ea689a88ef72b55eea49ed370729872b96af0ffb1ed", lines: [kirkstone, scarthgap]}
+  "MIT-CMU": {sha256: "367b445191e1a2d9e2078c329b1d3ebfec9b3d63f88af982a0331f2cb380864a", lines: [kirkstone, scarthgap]}
+  "MIT-enna": {sha256: "f9a92117b604caf0373ca5dfd120a3ce0aae882faba6c6b70b0991df6492227e", lines: [kirkstone, scarthgap]}
+  "MIT-feh": {sha256: "ed74c3623b7953132928e64837175d85d14d28ca1cfe03c35b57c49a2caba448", lines: [kirkstone, scarthgap]}
+  "MIT-Modern-Variant": {sha256: "d7366190045ad81a5e612799b8f4eef242f9b389a0040836aad61bebe9849647", lines: [kirkstone, scarthgap]}
+  "MIT-open-group": {sha256: "8e06c2e84fe9275766d1c22a5f194cd264f9664c568c3bdf1356624a65a4cfc4", lines: [kirkstone, scarthgap]}
+  "MITNFA": {sha256: "d436716f7a05466f52443893079761c8a88f4967d0ef490fabc0a1c9ef1c3a1d", lines: [kirkstone, scarthgap]}
+  "Motosoto": {sha256: "525026b138191187cc97487214cb79ade1e0619d65d82621a3c7918b1fdb51b8", lines: [kirkstone, scarthgap]}
+  "mpich2": {sha256: "8c5d410f9b829ed67c7bcd91da11d9058fae978c77c788a2cad2907cb068d8ec", lines: [kirkstone, scarthgap]}
+  "MPL-1.0": {sha256: "ca103eae270d887effd5f75990cab448bdbf97c85af6dd2eb030d891478ea87a", lines: [kirkstone, scarthgap]}
+  "MPL-1.1": {sha256: "babda8b3b5fba74d88c3bee5f6df583f56f1df7483289a84a9357158e9e0d965", lines: [kirkstone, scarthgap]}
+  "MPL-2.0": {sha256: "fab3dd6bdab226f1c08630b1dd917e11fcb4ec5e1e020e2c16f83a0a13863e85", lines: [kirkstone, scarthgap]}
+  "MPL-2.0-no-copyleft-exception": {sha256: "5decfe23d7ff1025df60a2b05696cf036e7160c370bf831c7c6787ff563d0ce2", lines: [kirkstone, scarthgap]}
+  "MS-PL": {sha256: "f2990f32daa111a168dbcbb9b67f7634da91a2f5ec84a2a04f85a897b6b177b6", lines: [kirkstone, scarthgap]}
+  "MS-RL": {sha256: "4bbab8a6042ee8c49253c8b25756142b2f022eecfe45ba00dcbd17585764a565", lines: [kirkstone, scarthgap]}
+  "MTLL": {sha256: "b3999fd83c5efc7758af8c5ea4e220f2f17938e5c3b69730591dade823e8666a", lines: [kirkstone, scarthgap]}
+  "MulanPSL-1.0": {sha256: "b43343cd1c032cd260893c7ed384157418ef7468bcae64547f4fd8e49f93572e", lines: [kirkstone, scarthgap]}
+  "MulanPSL-2.0": {sha256: "9ba683e8b900c1f8be43853787e010eb07389b160fcbf6c8c8332d13bdeb44de", lines: [kirkstone, scarthgap]}
+  "Multics": {sha256: "a6867bbc1490f5d99bf1fc1dd62dacaa937b51723623018b2489d5c71c3f227f", lines: [kirkstone, scarthgap]}
+  "Mup": {sha256: "2150061850ba3f03176b10c680386fd793923a3c28394048e8c1ca611cee3240", lines: [kirkstone, scarthgap]}
+  "NAIST-2003": {sha256: "0cc49a2743d845a9f3ea44ec3d7a6acc0aa8f0380772020310f3389713c45cbc", lines: [kirkstone, scarthgap]}
+  "NASA-1.3": {sha256: "79c0dace79e18120d31ea248700ff8d2a610882bc6c62393490ac37cabb23c58", lines: [kirkstone, scarthgap]}
+  "Naumen": {sha256: "ab999583e09a53632496f4614a2f587f4ed19cecb57a558aed92a0d1a4f3da79", lines: [kirkstone, scarthgap]}
+  "NBPL-1.0": {sha256: "856b837d14c15e0433c9516008a5a39e6807455ddd2d01d056bfb05ebb5c540f", lines: [kirkstone, scarthgap]}
+  "NCGL-UK-2.0": {sha256: "3d22a50dac08483a4bdca6ca8bc06b97d53b147cd43a1663182a5af58ca69fa0", lines: [kirkstone, scarthgap]}
+  "NCSA": {sha256: "90649256708fc9d0bce5199d034cb3e40afd3582e1d3b388aedd79fa840ed484", lines: [kirkstone, scarthgap]}
+  "Net-SNMP": {sha256: "edf2a6282bd3574dfe90461e1ba69325f27331ca072c5887f6a42b9e89495908", lines: [kirkstone, scarthgap]}
+  "NetCDF": {sha256: "1e78978ebd3b198c0eff362d9dc63cbdd5ffa6654484dcce44cc17510c47be17", lines: [kirkstone, scarthgap]}
+  "Newsletr": {sha256: "89c9cbe8677d8bd9a748747a6b412a1b03cc242eca241641d9a0f7969b4201c2", lines: [kirkstone, scarthgap]}
+  "NGPL": {sha256: "037525347b5deb3ae7695655357f12532ea3b57332fe8cf67a753d932a25ada1", lines: [kirkstone, scarthgap]}
+  "NIST-PD": {sha256: "df5608400c450115c45a01868b3ac1909c967ca589db779148adcb328d34fa35", lines: [kirkstone, scarthgap]}
+  "NIST-PD-fallback": {sha256: "fbd75808217bf1b9be0c209976435557e094322c4233211c4497f485fa987906", lines: [kirkstone, scarthgap]}
+  "NLOD-1.0": {sha256: "d5573513a243e2a7b8464c63281907e01245659f405d3efccc8b00cd7a59809e", lines: [kirkstone, scarthgap]}
+  "NLOD-2.0": {sha256: "b1b06f8f7771ed8d4ee958d984ffe269f48ce18ff6719e4a8ca59e3c6ae84361", lines: [kirkstone, scarthgap]}
+  "NLPL": {sha256: "bd220cd4ce2e9d09093135fdf4d3eacc4d44c9866426c56c96eba86dcc2d925d", lines: [kirkstone, scarthgap]}
+  "Nokia": {sha256: "2cebc4a6f2a2b7c02979fac09d1b13e1a0d055940032b2d1fbdb2ab47df8a772", lines: [kirkstone, scarthgap]}
+  "NOSL": {sha256: "c85abab0d02c1df3940601b5ccafa1e01a8aa9bfafbdaa9bfcf77d717f617e9c", lines: [kirkstone, scarthgap]}
+  "Noweb": {sha256: "1718bbd9a0a6b2e03fbb1f3e6e11cb0bfbd95e29cd5eef5988eb42a1c26385f9", lines: [kirkstone, scarthgap]}
+  "NPL-1.0": {sha256: "d1d01b2d6190c7669cf1dfb9827fd177498985c6cc345894c9bcfe84c31e8094", lines: [kirkstone, scarthgap]}
+  "NPL-1.1": {sha256: "2d4bf2cd4d477b68b1d80faa5cc86988e2bd643c3c55ab3fc165b8313d6badd7", lines: [kirkstone, scarthgap]}
+  "NPOSL-3.0": {sha256: "31c7c4a5c44b3f567ca163b1cf9f3ea55a53331417a97b88af8af5e5c3dc4561", lines: [kirkstone, scarthgap]}
+  "NRL": {sha256: "f22576bb7aa46c8f188ef1289e2bb13dd8585a8ff53851b8fde834e7b43fc839", lines: [kirkstone, scarthgap]}
+  "NTP": {sha256: "2c451dad1b9d33e370d5f9f1b2b6e0a4e9117c9d351eb2a2359bd005ec152f02", lines: [kirkstone, scarthgap]}
+  "NTP-0": {sha256: "95f2d2be04f88370e06c806324a96b1b1f57d5fc50f5da9ada19acf4b70206ba", lines: [kirkstone, scarthgap]}
+  "O-UDA-1.0": {sha256: "7bf99bb9cff7b91883ff56e1eabbf673dd5d9ce163316735d42a645a5cb1f1b2", lines: [kirkstone, scarthgap]}
+  "OASIS": {sha256: "d81957d2f874bfdfc7def0942447acd264eab956a64e7566f9e9e71c5a872a9e", lines: [kirkstone, scarthgap]}
+  "OCCT-PL": {sha256: "f096b806df28535bad2fec76544542a20baa9f69f75ac659d53037d0a4cd1f04", lines: [kirkstone, scarthgap]}
+  "OCLC-2.0": {sha256: "64fd11bcd5e01c56c68da98af77baa28d48383c9b7f01097fbd9117012b99cba", lines: [kirkstone, scarthgap]}
+  "ODbL-1.0": {sha256: "57316ab74cc2c720ce3e9ea011a58ac213e279098f613819100ab61d1a2a1ede", lines: [kirkstone, scarthgap]}
+  "ODC-By-1.0": {sha256: "b1c4de4bf91c95eec945ea7cbe0575fd52e7ee8fa430acb01d323d8214b1c482", lines: [kirkstone, scarthgap]}
+  "OFL-1.0": {sha256: "7e6a2968a3782383e1b427aafaf7f7c7737fff024294c4a4d0347557b1aecb10", lines: [kirkstone, scarthgap]}
+  "OFL-1.0-no-RFN": {sha256: "7e6a2968a3782383e1b427aafaf7f7c7737fff024294c4a4d0347557b1aecb10", lines: [kirkstone, scarthgap]}
+  "OFL-1.0-RFN": {sha256: "7e6a2968a3782383e1b427aafaf7f7c7737fff024294c4a4d0347557b1aecb10", lines: [kirkstone, scarthgap]}
+  "OFL-1.1": {sha256: "e69f565ccf245aa9a2fdc4193b9a09fd4618f49c7c52d2d6f80856a6d36e93c1", lines: [kirkstone, scarthgap]}
+  "OFL-1.1-no-RFN": {sha256: "8eea8287e5876b539670cadb82e99f9a7afddec6f6730811be1daf25d2e9bcfd", lines: [kirkstone, scarthgap]}
+  "OFL-1.1-RFN": {sha256: "8eea8287e5876b539670cadb82e99f9a7afddec6f6730811be1daf25d2e9bcfd", lines: [kirkstone, scarthgap]}
+  "OGC-1.0": {sha256: "95deb073011c1c2ae37c66965fe59f0405ef87b4009a36d9418cf42ab355b4fb", lines: [kirkstone, scarthgap]}
+  "OGDL-Taiwan-1.0": {sha256: "6fb1f786e1d278b6240b4816ba791d48fc84223e35da8a9263e42836bc154e94", lines: [kirkstone, scarthgap]}
+  "OGL-Canada-2.0": {sha256: "05c8b379c2fc4c491ac5899cd937a8c21176feba572c52811de0de7329b4cb7c", lines: [kirkstone, scarthgap]}
+  "OGL-UK-1.0": {sha256: "9a91ccfda6ea27a18a3abba9716215db887f530b6a8e4978faf39cd1f59eb619", lines: [kirkstone, scarthgap]}
+  "OGL-UK-2.0": {sha256: "dea956be58d1944c806229baeb5f4c3ade45decc2c855a1d738ae0ad014ff408", lines: [kirkstone, scarthgap]}
+  "OGL-UK-3.0": {sha256: "eb22384c866b63b513254ae3baff6b3bc7d001f559d03e02b6b8b83333a04806", lines: [kirkstone, scarthgap]}
+  "OGTSL": {sha256: "e32e36027f04946ef1ecf85580dbf23c43ee261d3139bab6b8d21bc7b8db052c", lines: [kirkstone, scarthgap]}
+  "OLDAP-1.1": {sha256: "48c9b242e69207b65c04b2c66ba32eabaa0b919c81368df0eaa39c615caf812e", lines: [kirkstone, scarthgap]}
+  "OLDAP-1.2": {sha256: "db22cb1867b8e1b1f9d81b3aeefcd2abb4e2e7234b1e5fb7009b1100eadf3f4a", lines: [kirkstone, scarthgap]}
+  "OLDAP-1.3": {sha256: "de86d2e938d43c21d83e06743fbfd3aa62e2327503b5e4132bac084197aca929", lines: [kirkstone, scarthgap]}
+  "OLDAP-1.4": {sha256: "5d6fe52457ed4d79d28e99ebb11063e5fb7be137ed001e327831873ee5c34724", lines: [kirkstone, scarthgap]}
+  "OLDAP-2.0": {sha256: "9aae161f485cd3c2c1e5eec46081914114d01e1b10cd8976c916cffa26b431ff", lines: [kirkstone, scarthgap]}
+  "OLDAP-2.0.1": {sha256: "6b3601cc98f64d1f2ef1b38812089bd0f0414377be6ec6e6a54c239115f75f36", lines: [kirkstone, scarthgap]}
+  "OLDAP-2.1": {sha256: "87425cd0c08b6793e8e80eb1cdb834c36e920bc39ca2e4fabe17735ecce844bb", lines: [kirkstone, scarthgap]}
+  "OLDAP-2.2": {sha256: "9f1fae576e39c76d698474446cab0e6f540e89cc9a4823381ad657a0f7cc1d29", lines: [kirkstone, scarthgap]}
+  "OLDAP-2.2.1": {sha256: "eba72913bfa6332516aa78309c3fe19482007b448a3b3a5822d2452ce686409b", lines: [kirkstone, scarthgap]}
+  "OLDAP-2.2.2": {sha256: "e57710b30df448549502dce8418e5fc181f2c6a511eb3e8239adf6c2e4f3f17d", lines: [kirkstone, scarthgap]}
+  "OLDAP-2.3": {sha256: "9ee0c6441186b94dd2eb0d531e86fc0db7941ee8d75acd43b73493569f31adbb", lines: [kirkstone, scarthgap]}
+  "OLDAP-2.4": {sha256: "4b548d1398e2c267e968e16749a3a89875a870a2ad072006c6dc4a346a6351cc", lines: [kirkstone, scarthgap]}
+  "OLDAP-2.5": {sha256: "7016e17ba63ff052e08716cb4faa54e984eabacbebd6f73299796def8b76a809", lines: [kirkstone, scarthgap]}
+  "OLDAP-2.6": {sha256: "9fd3f54cdc045d44fa951b9cd927516e09d7688bd3b375e50a7e3681d77e7112", lines: [kirkstone, scarthgap]}
+  "OLDAP-2.7": {sha256: "cb371808595ff77a5d9c57770ca799bd4d44e5aa397790126cb176308a13c590", lines: [kirkstone, scarthgap]}
+  "OLDAP-2.8": {sha256: "81ccedbd3ccda8a6827b290ffca66b369856805979dd84bad494172062b1a453", lines: [kirkstone, scarthgap]}
+  "OML": {sha256: "6d6cbb65c30870b70e1e261fca3c0d475acc1b26746824bee0db446be5452b76", lines: [kirkstone, scarthgap]}
+  "OpenSSL": {sha256: "cc46fa2f3ae91b13e13b3d01001e7e320637087d09ebd25a2d3bd25d14f7b6d9", lines: [kirkstone, scarthgap]}
+  "OPL-1.0": {sha256: "426dfae606856f71a18cdff4d7880fdfe72b5ace21b6af9fdd9c3102d6ea1c07", lines: [kirkstone, scarthgap]}
+  "OPUBL-1.0": {sha256: "82e4552fc0641224de50b710b8cfe78a6e75c9b31d72e494203e10f67e58bf61", lines: [kirkstone, scarthgap]}
+  "OSET-PL-2.1": {sha256: "9ed0bb9e29c24d014dacdb470da91f43961a47a88107b5c9344ef2f4d981364a", lines: [kirkstone, scarthgap]}
+  "OSL-1.0": {sha256: "2724e2962190c07cfbee9818b08c46676f363e6841c2b3cf4a5042ace38d1595", lines: [kirkstone, scarthgap]}
+  "OSL-1.1": {sha256: "2cb78904f44dfd665afc4753432c328421632f5ce9389d70a42efd3905ebc4d7", lines: [kirkstone, scarthgap]}
+  "OSL-2.0": {sha256: "ed81539f6a0c9fbd47fcda959c9475b56c137e5b77740b180e354087b839d89e", lines: [kirkstone, scarthgap]}
+  "OSL-2.1": {sha256: "0545a54adffe26d0cd2db10a5be3b26dc3bb7b3681d879a60a698927f7b2bd03", lines: [kirkstone, scarthgap]}
+  "OSL-3.0": {sha256: "ba743550ac1ac17b36a9720c76bf8b872c6c7d2d8dac2e17acdf4b29b26ed78d", lines: [kirkstone, scarthgap]}
+  "ParaTypeFFL-1.3": {sha256: "e54a9d0090886130c388778b72c703f9e765862873875d79eb243ec74272626f", lines: [kirkstone, scarthgap]}
+  "Parity-6.0.0": {sha256: "881b28495c80e972b4b8cb3fd3235bc5341781db6944878172f0bf79c5c53ab3", lines: [kirkstone, scarthgap]}
+  "Parity-7.0.0": {sha256: "5b3bf2359dfb9f95483270da7833be8fcc9e1758abffabb045991ec7c51ef796", lines: [kirkstone, scarthgap]}
+  "PD": {sha256: "b6284c990ca0bddd66e0ab42769cd0c1c6926883f2c5179eff2383b3a1af33fc", lines: [kirkstone, scarthgap]}
+  "PDDL-1.0": {sha256: "5998c272fd6b7d58b1450ed008be5bad9c492c8eb5f8c86124063c99a09467a7", lines: [kirkstone, scarthgap]}
+  "PHP-3.0": {sha256: "0d418315aa0be87381d77153beddccb551415cbf2d63df77808fbd383c670297", lines: [kirkstone, scarthgap]}
+  "PHP-3.01": {sha256: "c288e228ae7ccd27a39a7d4011057c85769a85e5fa38e91e31cec1f5549b1e7e", lines: [kirkstone, scarthgap]}
+  "pkgconf": {sha256: "8a42009b57c7bbcadc85b667da3b12a5f831058a4fa9a0c5cbddd455918c153d", lines: [kirkstone, scarthgap]}
+  "Plexus": {sha256: "22b94623b17585bdde3e1fd4f1749da139b656ebf5cf63c26d5c5fa9680a1aa8", lines: [kirkstone, scarthgap]}
+  "PolyForm-Noncommercial-1.0.0": {sha256: "ffcca38841adb694b6f380647e15f17c446a4d1656fed51a1e2041d064c94cc8", lines: [kirkstone, scarthgap]}
+  "PolyForm-Small-Business-1.0.0": {sha256: "2f81e317d36f83a199c9fa10bcb250775fd90510303eaeb15aac2d8f0c1fc2d6", lines: [kirkstone, scarthgap]}
+  "PostgreSQL": {sha256: "00b147c6c8ab1845bce1e8e5371a543659688aabbb3639719c1cd39b5ef25632", lines: [kirkstone, scarthgap]}
+  "Proprietary": {sha256: "93a3fe9b7c51982b94ef9934b5d3f7676fed5ef4d34f873c079af2d4490819ed", lines: [kirkstone, scarthgap]}
+  "PSF-2.0": {sha256: "c9662943cf6c15f1098001f97e77fa63755d8d5d32f201de4abf7406fe062fba", lines: [kirkstone, scarthgap]}
+  "psfrag": {sha256: "b14894fe36001fc867fb48736604e34223b2565448e63fb22476eb8fc02693ec", lines: [kirkstone, scarthgap]}
+  "psutils": {sha256: "515a50442da639fa0d82d002b99a95cd087b9ced41ecf49a0160f0695c1a9571", lines: [kirkstone, scarthgap]}
+  "Python-2.0": {sha256: "27949f720a0b9632e5f83e6e0163506fd967d43ca99989997d1f5a7bf0d0aa0f", lines: [kirkstone, scarthgap]}
+  "Qhull": {sha256: "e8437fa1b9bed4bdb334dd598aab3a3c319f28664d935b9cc2ca690ce8c8c444", lines: [kirkstone, scarthgap]}
+  "QPL-1.0": {sha256: "a74bcada2080085add8c6ee76b068a3391ccd6e371a8c519c44d75aae4bad923", lines: [kirkstone, scarthgap]}
+  "Rdisc": {sha256: "a389cabf55506a4983df23b75ed34c45affef185e5b670927b914189948035b9", lines: [kirkstone, scarthgap]}
+  "RHeCos-1": {sha256: "f67664f7224e364e1150fbf1e1aecc66a1e57218a2af27c37b053998d99b90b0", lines: [kirkstone, scarthgap]}
+  "RHeCos-1.1": {sha256: "161fb052c64c6575ca2c23d6487a0bbed1c58e2241be0fce9d912232724cfe73", lines: [kirkstone, scarthgap]}
+  "RPL-1.1": {sha256: "ea8d9811a051e7de6b7404ea1795dc4233a95d92950cb8c213e0f4245f181cac", lines: [kirkstone, scarthgap]}
+  "RPL-1.5": {sha256: "5a7c12c8098dd880c421b1d0de7a9ff030ace97a5dafd1dae5ba92b3e68d6e9a", lines: [kirkstone, scarthgap]}
+  "RPSL-1.0": {sha256: "0fd101063e5ab16e17a9f5c08eb5d5691c6488432c50a5c937c56901a0ff76d4", lines: [kirkstone, scarthgap]}
+  "RSA-MD": {sha256: "91a375b6dee034a2269e061179262e1080354aa22f420fbf22a6aeb265cd060f", lines: [kirkstone, scarthgap]}
+  "RSCPL": {sha256: "6e623e154e98d387e5d4595db4f3e0685bcfab193028da76357cb1184e13e819", lines: [kirkstone, scarthgap]}
+  "Ruby": {sha256: "a28b83d2ddd644861f0c696ba623b0eca9546a87cb5424fcb543d5ba1384bcde", lines: [kirkstone, scarthgap]}
+  "SAX-PD": {sha256: "969e3a637800ebed76499ac895ddedcf76d393901ccdf01c16a2c93c930e5dc4", lines: [kirkstone, scarthgap]}
+  "Saxpath": {sha256: "a1e209261a4b23b8d8a43208e948e24ea81be4f5a6b4ad726028a0885c3eaaf7", lines: [kirkstone, scarthgap]}
+  "SCEA": {sha256: "0698b27d130fb6f3195e4c50361441398e88e8378a753a13840e1160f5a7e397", lines: [kirkstone, scarthgap]}
+  "Sendmail": {sha256: "3e9d88d6efc1150456f660c2b375be7e9af5d7147bf90bb6c79f4b25a1e21424", lines: [kirkstone, scarthgap]}
+  "Sendmail-8.23": {sha256: "3d0eac09b2b9a24df644d55d074435461b7cc2dc4035acffa992e6b0f9a583ce", lines: [kirkstone, scarthgap]}
+  "SGI-1": {sha256: "53c7271927c252a573d3fec755c382cc316978a62650c692fbd27d9b4b8b3ad5", lines: [kirkstone, scarthgap]}
+  "SGI-B-1.0": {sha256: "fb7bdeebcec463ec8da4756f750b6544e382e0b011462325f852c705b87ee4ae", lines: [kirkstone, scarthgap]}
+  "SGI-B-1.1": {sha256: "bc095a0fd1a4b55d6edbe7325fc9c3194092da9712f4bfdabfa11d5b8c65ea32", lines: [kirkstone, scarthgap]}
+  "SGI-B-2.0": {sha256: "cbe043cc819b6afbac13c11d83c8bdcd566d1539881f17cab28615edd7af3acf", lines: [kirkstone, scarthgap]}
+  "SHL-0.5": {sha256: "e6e27c5b0e01fadc487f39caa237935b7365891bde56b6962188846f1eec6ad2", lines: [kirkstone, scarthgap]}
+  "SHL-0.51": {sha256: "3a8703a66bc3ac9a0c001549499b2528b01bc0e5a12c6fd968f7551e5b320448", lines: [kirkstone, scarthgap]}
+  "SimPL-2.0": {sha256: "c914635c3f2fcb078fd728f76fc1b0dc5abd4e976061bc32f2cea622b4a1b5ec", lines: [kirkstone, scarthgap]}
+  "Simple-2.0": {sha256: "b20fac74e5409e361ca9de0e9c419d7e9bf9ec18de3b784eee05d1c7de50e063", lines: [kirkstone, scarthgap]}
+  "SISSL": {sha256: "b78e4ae11663b1c3776e68df59128c2e4fbcd8a243c3a21c36f5cc48e55d7d13", lines: [kirkstone, scarthgap]}
+  "SISSL-1.2": {sha256: "794bc4c47a4bc76f3cf79960650ca62d781bd27fae32a4c9fb04818a65628f1b", lines: [kirkstone, scarthgap]}
+  "Sleepycat": {sha256: "778475a8547bb586510ee7fd1e0bb12bd58552aa71a02581785f9fadc99ca43c", lines: [kirkstone, scarthgap]}
+  "SMAIL_GPL": {sha256: "150fb36ba35e36bf407a01b0612d349b438def760d9de674fc60401367847110", lines: [kirkstone, scarthgap]}
+  "SMLNJ": {sha256: "772a7c6e457671d358559c6f242da9dc79f63b9301c93e22314cd5c032a1991e", lines: [kirkstone, scarthgap]}
+  "SMPPL": {sha256: "33681dc201fc6a1c028a57fea1830b81a2bc77207df925bb0d87603892343d17", lines: [kirkstone, scarthgap]}
+  "SNIA": {sha256: "91d5b2dd186cc5d201f35feba2106703457c4746b3f2cc677587c83887b0de2d", lines: [kirkstone, scarthgap]}
+  "Spencer-86": {sha256: "4d7db9b697a4939ac0c5d33b2f970b56a10f75b3f4b1b117faf3fb9e9ecb37d4", lines: [kirkstone, scarthgap]}
+  "Spencer-94": {sha256: "7fc18e76f0c124a3a568657b99e33df9bda7e4f71a493dd63d69956eb2117660", lines: [kirkstone, scarthgap]}
+  "Spencer-99": {sha256: "301dd94995194d81c49471a77e02957df588a2ec847dd2571cf797a5ca9ab65d", lines: [kirkstone, scarthgap]}
+  "SPL-1.0": {sha256: "23319e18163b4793ea793c0da815823f2b39aa26cc990a393caedba5110d8fdb", lines: [kirkstone, scarthgap]}
+  "SSH-OpenSSH": {sha256: "93ef72accf595b5da226a3492881e88b8464450ff13addb3ce4a3f7fdeb9f23c", lines: [kirkstone, scarthgap]}
+  "SSH-short": {sha256: "1aa57d2704f6783460f2750a9f3217d083ed5161eb95438ca43a5674213a7128", lines: [kirkstone, scarthgap]}
+  "SSPL-1.0": {sha256: "3fac2f3a7404f72330ae38e3a1d2632ede9ad3fbdb0d471d04c33f2c1d0e94ca", lines: [kirkstone, scarthgap]}
+  "SugarCRM-1": {sha256: "ad5cad8b95794e6d7e9ec729ead639744b8d213fe7930635e1c40b6f1ae54eba", lines: [kirkstone, scarthgap]}
+  "SugarCRM-1.1.3": {sha256: "61a97afbe3e9af1103bc72a32148fa268ba6906e1b71397639865e201f245ef2", lines: [kirkstone, scarthgap]}
+  "SWL": {sha256: "012aaf808a2dc69ac992b0902f20246db69a6b330fbc9f2d31f49473809ea1fc", lines: [kirkstone, scarthgap]}
+  "TAPR-OHL-1.0": {sha256: "b388f10f05822629ebd5c9b0779d3043d1a94e7e88ce7bb6b2cf6a098dc012ba", lines: [kirkstone, scarthgap]}
+  "TCL": {sha256: "36fc2d8a56a2a014ded51e298a7e63635eb4ec62e8bedb99c82b892542ac5e7d", lines: [kirkstone, scarthgap]}
+  "TCP-wrappers": {sha256: "0645a9c6aa32bbcb9b8576ea237cbf081e9c640454daac8666ef9f9300e629f9", lines: [kirkstone, scarthgap]}
+  "TMate": {sha256: "8596527f4b4ed7aa90489c3fc5ca7939db93c378f1cffa1edba65408f239876f", lines: [kirkstone, scarthgap]}
+  "TORQUE-1.1": {sha256: "fa1d8c1d1943bef10710b469f2d0fc95fd790eac9f23f92f805d2e4a07129d2e", lines: [kirkstone, scarthgap]}
+  "TOSL": {sha256: "3d65bc3ff37f202d56b1038cb19553a44d114787894daa99472849df8439169e", lines: [kirkstone, scarthgap]}
+  "TU-Berlin-1.0": {sha256: "2a4f230a4eb28fca3c97aeb6e9464b8790a7905a7153458bd488f30b73e59281", lines: [kirkstone, scarthgap]}
+  "TU-Berlin-2.0": {sha256: "765c0f8c765bf95b48bd6ab14a10bf06d76941b5079502fe385f847aaf8128ec", lines: [kirkstone, scarthgap]}
+  "UCB": {sha256: "0a4254e5bce8b53fc154ad0c152376ffc24978580d6e6e999d5904668a2cf1aa", lines: [kirkstone, scarthgap]}
+  "UCL-1.0": {sha256: "81c86c108696105f033b37dc4750a123d05ed684028e3909b1b6bdea9df5a29d", lines: [kirkstone, scarthgap]}
+  "unfs3": {sha256: "89049bddacd81f115baf437d6b3ed9810d48ec028121d8eda53f7a1b89e9df88", lines: [kirkstone, scarthgap]}
+  "Unicode-DFS-2015": {sha256: "89e104c664787a7e98d6ccb8c5c24fe8033ed75421ccbcfd360222732b5a3ccd", lines: [kirkstone, scarthgap]}
+  "Unicode-DFS-2016": {sha256: "1a33fc12a3abb0b3eb14db70e36ef1d0af51c93b1cc1f80f022c3bd406e9b874", lines: [kirkstone, scarthgap]}
+  "Unicode-TOU": {sha256: "cb6ba87a4979d8152c726eac13b4480d5bbddd206e0ade0cb91b769e5ca30025", lines: [kirkstone, scarthgap]}
+  "Unlicense": {sha256: "7e12e5df4bae12cb21581ba157ced20e1986a0508dd10d0e8a4ab9a4cf94e85c", lines: [kirkstone, scarthgap]}
+  "UPL-1.0": {sha256: "2f81e75033a0c872ab9725b36081e363f0c9e6c45585c35930edb66043fdc576", lines: [kirkstone, scarthgap]}
+  "Vim": {sha256: "2812610ab6a7304edf0282e236f9dd2bd9e47db05f3abed7538c57173d1ed73b", lines: [kirkstone, scarthgap]}
+  "VOSTROM": {sha256: "1c7762c7e3ccc74bd0e4359b05ad33e95d5838099c41e8ce49842f8558546ec6", lines: [kirkstone, scarthgap]}
+  "VSL-1.0": {sha256: "59f920fb927c1bf7ffa790712a9b5788c6b11e03f8242d5c2011e94f7d259032", lines: [kirkstone, scarthgap]}
+  "W3C": {sha256: "8a22ae827afd6a474f960e74679b3456aa2d29deccce68358a6cef43e53c96e4", lines: [kirkstone, scarthgap]}
+  "W3C-19980720": {sha256: "038839fbeeedc3e12d626b4331b6f5ff01d64dc52e595f44192dee93ae94c20c", lines: [kirkstone, scarthgap]}
+  "W3C-20150513": {sha256: "38b688e653a972897f6a875c53abbf867b261cbeba7ded0bdf100ae9907a6c19", lines: [kirkstone, scarthgap]}
+  "Watcom-1.0": {sha256: "7761d7daccbfd2c1eb769a3172ca9c8a701fb74017eaff4e4574f97492bcfd66", lines: [kirkstone, scarthgap]}
+  "Wsuipa": {sha256: "f6c08f21d0b12e77ba730cab5ce6d55c2b65fd01a19c51a7c36134a6c83bc04a", lines: [kirkstone, scarthgap]}
+  "WTFPL": {sha256: "13d8825a59e5e546d41e8711405d0f335a9934362a47c04a3b4280fa7932dc4a", lines: [kirkstone, scarthgap]}
+  "WXwindows": {sha256: "14cde692f02f20cd99440d632d59e2daa3dd593372e183e0e6f372924a9db52d", lines: [kirkstone, scarthgap]}
+  "X11": {sha256: "e1963c9958b93bc2578b34f8ae22cfe205e8c0e7d5be7235cfdbdefbf92a5423", lines: [kirkstone, scarthgap]}
+  "Xerox": {sha256: "2dc0b8da7071d88b88e4f7b7de338d5339bc44ffb1889d66d63ef9b9ac5e5d11", lines: [kirkstone, scarthgap]}
+  "XFree86-1.0": {sha256: "07f48b0e9bd2d07fc6b08e87a53d6ae7a27546984c961213e9902a2d4e5a1ffb", lines: [kirkstone, scarthgap]}
+  "XFree86-1.1": {sha256: "e9f28d77813cb5dea58ead1fb62d8161e95e302eb1be866f94565f04697f34ba", lines: [kirkstone, scarthgap]}
+  "xinetd": {sha256: "7b3cf46961d23cf845ac7c52075693b6ca31389e1534c655333b4b6fe0459bd4", lines: [kirkstone, scarthgap]}
+  "Xnet": {sha256: "b144fac58c2367a18f5a1f8bc7c359da863e01859c1190bc3bb29041f082702b", lines: [kirkstone, scarthgap]}
+  "xpp": {sha256: "7357cebf92b4a7b3667e81c15a56eb1e0b4c61f8161c1e6faeccab22912a9879", lines: [kirkstone, scarthgap]}
+  "XSkat": {sha256: "ed84c6b9d91007c072aa95bc50768cd2fe3451eaeba31f824f95698cd006341b", lines: [kirkstone, scarthgap]}
+  "XSL": {sha256: "fbcc8cbe595f2701cb0f25cd6063eeab513214c729fad41a3253b70d2fbf211e", lines: [kirkstone, scarthgap]}
+  "YPL-1.0": {sha256: "345d93c4029b04cade2533b1e2aae012090e055a60b5d4cf1d4a68a5046eeec7", lines: [kirkstone, scarthgap]}
+  "YPL-1.1": {sha256: "df11a5124ac5726bf1912393ab87827ad2689342636e3b61915839889991c961", lines: [kirkstone, scarthgap]}
+  "Zed": {sha256: "673b1f47ed660463e8bad23e7a1dc14c24847765167629a15e7a3b80601946ed", lines: [kirkstone, scarthgap]}
+  "Zend-2.0": {sha256: "c501915ee7c588173de03db9a8ca105c1baadb16bb05bca211700b850bcb077d", lines: [kirkstone, scarthgap]}
+  "Zimbra-1.3": {sha256: "a954c89f5db3374d3878f79bcfaefd42773414818e0b60a4bc9aa81ee64a9ca5", lines: [kirkstone, scarthgap]}
+  "Zimbra-1.4": {sha256: "d2b8dafada0490c22d39079793ccc6ce4dbb38a9c071ef96152ef1d6a759e511", lines: [kirkstone, scarthgap]}
+  "Zlib": {sha256: "fb8f439f498972d36f50c9f19c29e108ba9b90998a060e4ffc912a10aa5dbfe4", lines: [kirkstone, scarthgap]}
+  "zlib-acknowledgement": {sha256: "aeb83cf7f4c9076691f72856d3b8f64a152027e9b1a136d399198c683fd26c12", lines: [kirkstone, scarthgap]}
+  "ZPL-1.1": {sha256: "5ba439d9d0d91b6edbd45e61504f68c3bb679c68de970d4a45a7ac6178a58f27", lines: [kirkstone, scarthgap]}
+  "ZPL-2.0": {sha256: "1f0991985ba24e6502ff04075ebf27f431b7f8b819fd79c133f4ba643cf3c89f", lines: [kirkstone, scarthgap]}
+  "ZPL-2.1": {sha256: "9e2a95859b484af57e4292c1c4cb6130a530d50c61896c8dabf7970eb3cabce2", lines: [kirkstone, scarthgap]}
+
+# poky's own aliases: SPDXLICENSEMAP in meta/conf/licenses.conf, every line as
+# written. A recipe's LICENSE (pkgdata carries it raw) may use the key; the
+# target is poky's statement, not a text comparison. Both lines carry the same
+# file: kirkstone 445a6223 (fetched read-only, coordination 14.11.2026) and
+# scarthgap b6ae714 (clean clone), sha256 below. 75 lines: 17 keys are
+# deprecated SPDX identifiers (SPDX 3.28.0), 58 are no SPDX identifier.
+spdxlicensemap:
+  source: "poky meta/conf/licenses.conf SPDXLICENSEMAP"
+  sha256: "ffaabdb8a084f2e928a9ba57ecebe13dd4ed12d34f0fc1b3527dff423881ce41"
+  lines: [kirkstone, scarthgap]
+  keys:
+    "AGPL-3": "AGPL-3.0-only"
+    "AGPL-3+": "AGPL-3.0-or-later"
+    "AGPLv3": "AGPL-3.0-only"
+    "AGPLv3+": "AGPL-3.0-or-later"
+    "AGPLv3.0": "AGPL-3.0-only"
+    "AGPLv3.0+": "AGPL-3.0-or-later"
+    "AGPL-3.0": "AGPL-3.0-only"
+    "AGPL-3.0+": "AGPL-3.0-or-later"
+    "BSD-0-Clause": "0BSD"
+    "GPL-1": "GPL-1.0-only"
+    "GPL-1+": "GPL-1.0-or-later"
+    "GPLv1": "GPL-1.0-only"
+    "GPLv1+": "GPL-1.0-or-later"
+    "GPLv1.0": "GPL-1.0-only"
+    "GPLv1.0+": "GPL-1.0-or-later"
+    "GPL-1.0": "GPL-1.0-only"
+    "GPL-1.0+": "GPL-1.0-or-later"
+    "GPL-2": "GPL-2.0-only"
+    "GPL-2+": "GPL-2.0-or-later"
+    "GPLv2": "GPL-2.0-only"
+    "GPLv2+": "GPL-2.0-or-later"
+    "GPLv2.0": "GPL-2.0-only"
+    "GPLv2.0+": "GPL-2.0-or-later"
+    "GPL-2.0": "GPL-2.0-only"
+    "GPL-2.0+": "GPL-2.0-or-later"
+    "GPL-3": "GPL-3.0-only"
+    "GPL-3+": "GPL-3.0-or-later"
+    "GPLv3": "GPL-3.0-only"
+    "GPLv3+": "GPL-3.0-or-later"
+    "GPLv3.0": "GPL-3.0-only"
+    "GPLv3.0+": "GPL-3.0-or-later"
+    "GPL-3.0": "GPL-3.0-only"
+    "GPL-3.0+": "GPL-3.0-or-later"
+    "LGPLv2": "LGPL-2.0-only"
+    "LGPLv2+": "LGPL-2.0-or-later"
+    "LGPLv2.0": "LGPL-2.0-only"
+    "LGPLv2.0+": "LGPL-2.0-or-later"
+    "LGPL-2.0": "LGPL-2.0-only"
+    "LGPL-2.0+": "LGPL-2.0-or-later"
+    "LGPL2.1": "LGPL-2.1-only"
+    "LGPL2.1+": "LGPL-2.1-or-later"
+    "LGPLv2.1": "LGPL-2.1-only"
+    "LGPLv2.1+": "LGPL-2.1-or-later"
+    "LGPL-2.1": "LGPL-2.1-only"
+    "LGPL-2.1+": "LGPL-2.1-or-later"
+    "LGPLv3": "LGPL-3.0-only"
+    "LGPLv3+": "LGPL-3.0-or-later"
+    "LGPL-3.0": "LGPL-3.0-only"
+    "LGPL-3.0+": "LGPL-3.0-or-later"
+    "MPL-1": "MPL-1.0"
+    "MPLv1": "MPL-1.0"
+    "MPLv1.1": "MPL-1.1"
+    "MPLv2": "MPL-2.0"
+    "MIT-X": "MIT"
+    "MIT-style": "MIT"
+    "openssl": "OpenSSL"
+    "PSF": "PSF-2.0"
+    "PSFv2": "PSF-2.0"
+    "Python-2": "Python-2.0"
+    "Apachev2": "Apache-2.0"
+    "Apache-2": "Apache-2.0"
+    "Artisticv1": "Artistic-1.0"
+    "Artistic-1": "Artistic-1.0"
+    "AFL-2": "AFL-2.0"
+    "AFL-1": "AFL-1.2"
+    "AFLv2": "AFL-2.0"
+    "AFLv1": "AFL-1.2"
+    "CDDLv1": "CDDL-1.0"
+    "CDDL-1": "CDDL-1.0"
+    "EPLv1.0": "EPL-1.0"
+    "FreeType": "FTL"
+    "Nauman": "Naumen"
+    "tcl": "TCL"
+    "vim": "Vim"
+    "SGIv1": "SGI-1"

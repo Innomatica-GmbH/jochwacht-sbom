@@ -324,19 +324,30 @@ def _yocto_build_components(
     suite-d's finder (yocto_build.py) and the shared core
     (sbom/build_files_yocto.py) read the build with the image manifest's
     names; this writes them onto CheckComponent like the Buildroot packages.
-    The build evidence sits in fields excluded from the payload and from the
-    upload. No licence: the core passes none the build proves per package.
+    The build evidence sits in fields excluded from the payload. The licence
+    is the one the core reads from pkgdata (LICENSE:<pkg> before LICENSE),
+    already in the order of TR-03183-2 §6.1, with where it was read
+    (yocto-lizenz-pkgdata, coordination 14.11.2026).
     """
     from jochwacht_sbom.sbom.buildoutput import _purl
     from jochwacht_sbom.sbom.classify import strip_control_chars as clean
     from jochwacht_sbom.yocto_build import read_yocto_builds
 
+    gaps: list[tuple[Path, str]] = []
     try:
         with _reader_warnings(warnings):
-            reads = read_yocto_builds(path)
+            reads = read_yocto_builds(path, gaps)
     except Exception as exc:  # noqa: BLE001 — a reader defect, recorded, not fatal
         record_failure("yocto_build", "deploy/images/*.manifest", exc)
         return []
+    for tmp, reason in gaps:
+        # A state of the customer's build, named as such (coordination,
+        # 14.11.2026): which manifest is the image's is unknown, so no
+        # package of it is claimed, and no other manifest decides.
+        where = Path(os.path.relpath(tmp, path)).as_posix()
+        warnings.append(f"Yocto build at {where}: the scope of delivery is unknown "
+                        f"({reason}); no package of this build is in the bill, "
+                        "the bill of materials is INCOMPLETE")
     out: list[CheckComponent] = []
     for read in reads:
         build = read.build
@@ -352,6 +363,9 @@ def _yocto_build_components(
                 tier=_LOCKFILE_TIER, confidence=_LOCKFILE_CONFIDENCE,
                 scope="excluded" if entry.excluded else "",
                 scope_reason=build.scope_reason if entry.excluded else "",
+                local_license=clean(entry.license),
+                local_license_origin=clean(entry.license_origin) if entry.license else "",
+                local_license_is_text=entry.license_is_text,
                 delivered_files=list(entry.files), not_evidenced=entry.not_evidenced,
                 creator_url=entry.creator.url if entry.creator else "",
                 creator_origin=entry.creator.origin if entry.creator else "",
