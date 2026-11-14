@@ -176,7 +176,7 @@ def test_the_readme_says_when_an_upload_is_unchanged() -> None:
         "that check runs on it again.",
         "The newest 10 file states of each version are kept;",
         "a file state that was in force when a report went to the customer is always kept.",
-        "The very same file, byte for byte, sent again adds no file state; "
+        "The file in force, byte for byte, sent again adds no file state; "
         "only its receipt is recorded.",
     ):
         assert sentence in readme, sentence
@@ -187,12 +187,15 @@ def test_the_readme_says_when_an_upload_is_unchanged() -> None:
 
 
 def test_the_readme_says_the_enrichment_follows_the_file_in_force() -> None:
-    """daten, daten-postgres 77af3763: an enrichment names its source file
-    (bytes_sha256) and is served only for the file in force."""
+    """daten, daten-postgres 77af3763 (intake.py, newest_enrichment_in): the
+    intake compares with the file in force only, and an enrichment is bound to
+    the bytes it was made from (A, B, A: A's enrichment counts again)."""
     readme = " ".join((Path(__file__).resolve().parents[1] / "README.md")
                       .read_text(encoding="utf-8").split())
-    assert ("The enriched bill always belongs to the file in force of the version, "
-            "the newest file state.") in readme
-    assert ("When a new file state arrives, an older enrichment no longer counts, "
-            "not even for an older build; the enrichment is made anew for the new "
-            "file.") in readme
+    assert ("An enrichment counts only for the file it was made from; when a new file "
+            "state arrives, an enrichment of other bytes no longer counts, not even "
+            "for an older build.") in readme
+    assert ("A file sent again that was in force earlier is a new file state and in "
+            "force again, and so is the enrichment made from it.") in readme
+    for wrong in ("The very same file, byte for byte", "an older enrichment no longer counts"):
+        assert wrong not in readme, wrong

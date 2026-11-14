@@ -177,13 +177,13 @@ user name is in it.
   state is in force: it is the download and the evidence, and if your package
   includes the TR-03183 check and the release is fully checked, that check runs
   on it again. The newest 10 file states of each version are kept; a file state
-  that was in force when a report went to the customer is always kept. The very
-  same file, byte for byte, sent again adds no file state; only its receipt is
+  that was in force when a report went to the customer is always kept. The file
+  in force, byte for byte, sent again adds no file state; only its receipt is
   recorded.
-- The enriched bill always belongs to the file in force of the version, the
-  newest file state. When a new file state arrives, an older enrichment no
-  longer counts, not even for an older build; the enrichment is made anew for
-  the new file.
+- An enrichment counts only for the file it was made from; when a new file
+  state arrives, an enrichment of other bytes no longer counts, not even for an
+  older build. A file sent again that was in force earlier is a new file state
+  and in force again, and so is the enrichment made from it.
 - In CI, name the release with `--release` in the pipeline (for example your
   tag). The derived label is meant for work on your own machine: it comes from
   the scanned content, so a folder you do not control (a pull request from a
