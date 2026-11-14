@@ -731,9 +731,11 @@ def _buildroot_sbom(build_dir: Path) -> tuple[Path | None, dict[str, object] | N
     for path in inside:
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-        except (ValueError, OSError, RecursionError) as exc:
+        except (ValueError, OSError, RecursionError) as exc:  # Y5, foreign bytes
             return None, None, f"Failed to parse {path}: {exc}"
-        if isinstance(data, dict) and data.get("bomFormat") == "CycloneDX":
+        if not isinstance(data, dict):  # valid JSON, no document (J1, sicherheit-2)
+            return None, None, f"Failed to parse {path}: no JSON object at the root"
+        if data.get("bomFormat") == "CycloneDX":
             return path, data, named
     return None, None, named
 
@@ -792,8 +794,11 @@ def buildroot_package(comp: dict[str, object]) -> tuple[BuildrootPackage | None,
     package = bom_ref if bom_ref.startswith("host-") else name
     pedigree = comp.get("pedigree")
     raw = pedigree.get("patches") if isinstance(pedigree, dict) else None
-    patches = [p for p in raw if isinstance(p, dict) and p.get("type") in PATCH_TYPES] \
-        if isinstance(raw, list) else []
+    # A type that is no string (a list, an object) is no valid type; never
+    # hashed against the set (J3, sicherheit-2).
+    patches = [p for p in raw
+               if isinstance(p, dict) and isinstance(p.get("type"), str)
+               and p.get("type") in PATCH_TYPES] if isinstance(raw, list) else []
     supplier = comp.get("supplier")
     cpe = comp.get("cpe")
     return BuildrootPackage(
