@@ -172,9 +172,15 @@ def test_the_readme_says_when_an_upload_is_unchanged() -> None:
         "(name, version, purl, CPE).",
         "the answer is `unchanged`: no new run, no report, no alarm, and the upload "
         "does not count against the daily limit.",
-        "the TR-03183 check runs on it again.",
+        "if your package includes the TR-03183 check and the release is fully checked, "
+        "that check runs on it again.",
         "The newest 10 file states of each version are kept;",
         "a file state that was in force when a report went to the customer is always kept.",
-        "The very same file, byte for byte, sent again creates nothing.",
+        "The very same file, byte for byte, sent again adds no file state; "
+        "only its receipt is recorded.",
     ):
         assert sentence in readme, sentence
+    # sicherheit-2 on ab99784: the check needs the entitlement and a full
+    # release; a byte-equal upload still leaves its receipt
+    assert "the TR-03183 check runs on it again" not in readme
+    assert "creates nothing" not in readme

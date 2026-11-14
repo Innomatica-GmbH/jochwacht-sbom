@@ -173,10 +173,12 @@ user name is in it.
   hashes) is not a new version but a new file state of the current version,
   and the answer is `unchanged`: no new run, no report, no alarm, and the
   upload does not count against the daily limit. From then on the newest file
-  state is in force: it is the download and the evidence, and the TR-03183
-  check runs on it again. The newest 10 file states of each version are kept;
-  a file state that was in force when a report went to the customer is always
-  kept. The very same file, byte for byte, sent again creates nothing.
+  state is in force: it is the download and the evidence, and if your package
+  includes the TR-03183 check and the release is fully checked, that check runs
+  on it again. The newest 10 file states of each version are kept; a file state
+  that was in force when a report went to the customer is always kept. The very
+  same file, byte for byte, sent again adds no file state; only its receipt is
+  recorded.
 - In CI, name the release with `--release` in the pipeline (for example your
   tag). The derived label is meant for work on your own machine: it comes from
   the scanned content, so a folder you do not control (a pull request from a
