@@ -35,7 +35,11 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=["pytest", "mypy", "ruff"],
+    # pydantic.mypy (the mypy plugin) imports tomli; PyInstaller then aliases
+    # setuptools' vendored copy and bundles all of setuptools (14.11.2026,
+    # found while writing the binary's SBOM). The collector uses none of it.
+    excludes=["pytest", "mypy", "ruff", "pydantic.mypy", "setuptools",
+              "_distutils_hack", "pkg_resources"],
     noarchive=False,
 )
 

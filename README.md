@@ -99,6 +99,13 @@ jochwacht-sbom .                     # reads your build, writes sbom.cdx.json
 You now have your own CycloneDX SBOM. An existing `sbom.cdx.json` is never
 silently overwritten.
 
+The standalone Linux binary has its own SBOM — Python and every library
+bundled into it, from version 0.21.0 on: it is attached to each GitHub release
+as `jochwacht-sbom-<version>-linux-x86_64.cdx.json`, with its `.sha256`, next
+to the binary. A release is published only when no library of the binary or
+of the wheel's resolution has a known vulnerability (pip-audit over the
+hashed locks in `ci/release/`).
+
 More options: `jochwacht-sbom --help` — including `--sbom PATH` (write the
 SBOM elsewhere) and `--with-tools` to additionally use native package-manager
 CLIs for higher-fidelity results.
