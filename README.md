@@ -180,6 +180,10 @@ user name is in it.
   that was in force when a report went to the customer is always kept. The very
   same file, byte for byte, sent again adds no file state; only its receipt is
   recorded.
+- The enriched bill always belongs to the file in force of the version, the
+  newest file state. When a new file state arrives, an older enrichment no
+  longer counts, not even for an older build; the enrichment is made anew for
+  the new file.
 - In CI, name the release with `--release` in the pipeline (for example your
   tag). The derived label is meant for work on your own machine: it comes from
   the scanned content, so a folder you do not control (a pull request from a

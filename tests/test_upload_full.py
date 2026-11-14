@@ -184,3 +184,15 @@ def test_the_readme_says_when_an_upload_is_unchanged() -> None:
     # release; a byte-equal upload still leaves its receipt
     assert "the TR-03183 check runs on it again" not in readme
     assert "creates nothing" not in readme
+
+
+def test_the_readme_says_the_enrichment_follows_the_file_in_force() -> None:
+    """daten, daten-postgres 77af3763: an enrichment names its source file
+    (bytes_sha256) and is served only for the file in force."""
+    readme = " ".join((Path(__file__).resolve().parents[1] / "README.md")
+                      .read_text(encoding="utf-8").split())
+    assert ("The enriched bill always belongs to the file in force of the version, "
+            "the newest file state.") in readme
+    assert ("When a new file state arrives, an older enrichment no longer counts, "
+            "not even for an older build; the enrichment is made anew for the new "
+            "file.") in readme
